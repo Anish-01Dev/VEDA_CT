@@ -720,7 +720,7 @@ export function GlobalGuideProvider({ children }: { children: React.ReactNode })
         )}
       </AnimatePresence>
 
-      <style jsx global>{`
+      <style>{`
         @keyframes guideElementPulse {
           0%, 100% { 
             opacity: 1;

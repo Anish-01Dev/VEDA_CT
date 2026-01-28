@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/language-context";
 import { GlobalGuideProvider } from "@/contexts/guide-context";
+import { AuthProvider } from "@/contexts/auth-context";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import HealthPage from "./pages/HealthPage";
@@ -35,12 +36,13 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <LanguageProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <GlobalGuideProvider>
+    <AuthProvider>
+      <LanguageProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <GlobalGuideProvider>
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/health" element={<HealthPage />} />
@@ -68,10 +70,11 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </GlobalGuideProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </LanguageProvider>
+            </GlobalGuideProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </LanguageProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 
