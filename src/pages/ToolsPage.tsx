@@ -221,7 +221,7 @@ const ToolsPage = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-[#F8F5F0] rounded-2xl p-6"
+          className="bg-[#F8F5F0] rounded-2xl p-6 tools-section"
         >
           <Card className="bg-white border border-[#E2E8F0]">
             <CardHeader className="pb-3">
@@ -230,7 +230,7 @@ const ToolsPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 tools-grid">
                 {filteredTools.map((tool, index) => {
                   const colorInfo = TOOL_COLOR_MAP[tool.id] || { color: '#4A9B8E', bg: '#4A9B8E20' };
                   return (

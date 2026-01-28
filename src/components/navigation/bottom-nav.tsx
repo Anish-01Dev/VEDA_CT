@@ -26,7 +26,7 @@ export function BottomNav({ items, className }: BottomNavProps) {
   return (
     <motion.div 
       className={cn(
-        "fixed bottom-0 left-0 right-0 bg-card border-t border-[#E2E8F0] z-40",
+        "fixed bottom-0 left-0 right-0 bg-card border-t border-[#E2E8F0] z-40 bottom-nav",
         "pb-safe-area-inset-bottom shadow-2xl shadow-black/10",
         className
       )}

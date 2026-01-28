@@ -27,6 +27,7 @@ import ApiTestComponent from "@/components/debug/ApiTestComponent";
 import EnhancedSymptomCheckerV2 from "@/components/ai/enhanced-symptom-checker-v2";
 import HealthDashboard from "@/components/dashboard/health-dashboard";
 
+
 gsap.registerPlugin(ScrollTrigger);
 
 
@@ -77,13 +78,13 @@ const Index = () => {
             <HeroSection />
 
             {/* Quick Health Check Section */}
-            <section className="w-full bg-[#F8F5F0] rounded-2xl p-6 mb-6">
+            <section className="w-full bg-[#F8F5F0] rounded-2xl p-6 mb-6 quick-actions-section">
               <h2 className="text-2xl font-bold text-[#2D3748] font-nunito mb-6">{t('quick.health.check')}</h2>
               <QuickActionsSection />
             </section>
 
             {/* Health Modules Section */}
-            <section className="w-full bg-[#F8F5F0] rounded-2xl p-6">
+            <section className="w-full bg-[#F8F5F0] rounded-2xl p-6 health-metrics-section">
               <h2 className="text-2xl font-bold text-[#2D3748] font-nunito mb-6">{t('health.modules')}</h2>
               <HealthMetricsSection />
             </section>
@@ -168,6 +169,8 @@ const Index = () => {
           >
             <BottomNav items={navItems} />
           </motion.div>
+
+
         </div>
       </AnimatePresence>
     </ErrorBoundary>
