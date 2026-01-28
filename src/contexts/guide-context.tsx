@@ -318,12 +318,32 @@ export function GlobalGuideProvider({ children }: { children: React.ReactNode })
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [hasSeenGuide, setHasSeenGuide] = useState(false);
   const [highlightedElement, setHighlightedElement] = useState<Element | null>(null);
   const [elementRect, setElementRect] = useState<DOMRect | null>(null);
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  // Check if user has seen guide before
+  useEffect(() => {
+    const hasSeenBefore = localStorage.getItem('vaidyana-guide-seen');
+    if (!hasSeenBefore) {
+      // First time visitor - auto start guide after 2 seconds
+      timeoutRef.current = setTimeout(() => {
+        setIsOpen(true);
+      }, 2000);
+    } else {
+      setHasSeenGuide(true);
+    }
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [location.pathname]);
 
   const currentPageGuides = pageGuides[location.pathname] || pageGuides['/'];
   const steps = currentPageGuides[currentLanguage] || currentPageGuides.en;
@@ -434,12 +454,18 @@ export function GlobalGuideProvider({ children }: { children: React.ReactNode })
     setIsOpen(false);
     setHighlightedElement(null);
     setElementRect(null);
+    // Mark as seen when user closes guide
+    localStorage.setItem('vaidyana-guide-seen', 'true');
+    setHasSeenGuide(true);
   };
 
   const nextStep = () => {
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
+      // Mark as seen when user completes guide
+      localStorage.setItem('vaidyana-guide-seen', 'true');
+      setHasSeenGuide(true);
       closeGuide();
     }
   };
