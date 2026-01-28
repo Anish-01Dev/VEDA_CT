@@ -3,8 +3,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Mic, MicOff, Volume2, VolumeX, Stethoscope } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, Stethoscope, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LanguageDetector, type SupportedLanguage } from '@/lib/language-detection';
 
 interface Message {
   id: string;
@@ -14,18 +15,27 @@ interface Message {
 }
 
 export default function VirtualDoctorAvatar() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: "Hello! I'm your Virtual Medical Assistant. I'm here to help with your health concerns today. I am not a doctor, but I can help provide general health information. This is not a substitute for professional medical advice, diagnosis, or treatment. Please consult a qualified healthcare professional. How are you feeling today? What brings you here?",
-      sender: 'doctor',
-      timestamp: new Date()
-    }
-  ]);
+  const [currentLanguage, setCurrentLanguage] = useState<SupportedLanguage>('en');
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
   const [synthesis] = useState(window.speechSynthesis);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const getInitialMessage = (lang: SupportedLanguage): Message => ({
+    id: '1',
+    content: lang === 'hi' 
+      ? "नमस्ते! मैं आपका वर्चुअल मेडिकल असिस्टेंट हूं। मैं आज आपकी स्वास्थ्य संबंधी चिंताओं में मदद करने के लिए यहां हूं। मैं डॉक्टर नहीं हूं, लेकिन सामान्य स्वास्थ्य जानकारी प्रदान कर सकता हूं। यह पेशेवर चिकित्सा सलाह, निदान या उपचार का विकल्प नहीं है। कृपया किसी योग्य डॉक्टर से सलाह लें। आज आप कैसा महसूस कर रहे हैं? आप यहां क्यों आए हैं?"
+      : "Hello! I'm your Virtual Medical Assistant. I'm here to help with your health concerns today. I am not a doctor, but I can help provide general health information. This is not a substitute for professional medical advice, diagnosis, or treatment. Please consult a qualified healthcare professional. How are you feeling today? What brings you here?",
+    sender: 'doctor',
+    timestamp: new Date()
+  });
+
+  // Initialize messages when language changes
+  useEffect(() => {
+    setMessages([getInitialMessage(currentLanguage)]);
+  }, [currentLanguage]);
 
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -33,7 +43,7 @@ export default function VirtualDoctorAvatar() {
       const recognitionInstance = new SpeechRecognition();
       recognitionInstance.continuous = false;
       recognitionInstance.interimResults = false;
-      recognitionInstance.lang = 'en-US';
+      recognitionInstance.lang = currentLanguage === 'hi' ? 'hi-IN' : 'en-US';
       
       recognitionInstance.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
@@ -43,7 +53,15 @@ export default function VirtualDoctorAvatar() {
       recognitionInstance.onend = () => setIsListening(false);
       setRecognition(recognitionInstance);
     }
-  }, []);
+    
+    // Load voices for speech synthesis
+    const loadVoices = () => {
+      if (synthesis.getVoices().length === 0) {
+        synthesis.addEventListener('voiceschanged', loadVoices);
+      }
+    };
+    loadVoices();
+  }, [currentLanguage]);
 
   const handleUserInput = async (input: string) => {
     const userMessage: Message = {
@@ -69,86 +87,153 @@ export default function VirtualDoctorAvatar() {
     const lowerInput = input.toLowerCase();
     
     // Emergency detection
-    const emergencyKeywords = ['chest pain', 'can\'t breathe', 'difficulty breathing', 'stroke', 'bleeding', 'unconscious', 'seizure', 'suicide'];
+    const emergencyKeywords = ['chest pain', 'can\'t breathe', 'difficulty breathing', 'stroke', 'bleeding', 'unconscious', 'seizure', 'suicide', 'सीने में दर्द', 'सांस नहीं आ रही', 'दम घुट रहा', 'बेहोश', 'खून बह रहा'];
     if (emergencyKeywords.some(keyword => lowerInput.includes(keyword))) {
-      return "These symptoms may be serious. Please seek emergency medical care or contact local emergency services immediately.";
+      return currentLanguage === 'hi' 
+        ? "ये लक्षण गंभीर हो सकते हैं। कृपया तुरंत आपातकालीन चिकित्सा सहायता लें।"
+        : "These symptoms may be serious. Please seek emergency medical care immediately.";
     }
 
     // Basic symptom responses
-    if (lowerInput.includes('headache')) {
-      return "I understand you're experiencing a headache. Let me ask you a few questions. How long have you had this headache? Is it mild, moderate, or severe? Based on what you described, headaches can have various causes like stress, dehydration, or tension. I suggest drinking water, resting in a quiet room, and you might consider an over-the-counter pain reliever like acetaminophen if safe for you. However, if the headache is severe or persistent, please consult a healthcare professional.";
+    if (lowerInput.includes('headache') || lowerInput.includes('सिरदर्द')) {
+      return currentLanguage === 'hi'
+        ? "मैं समझ सकता हूं कि आपको सिरदर्द है। यह कितने समय से है? क्या यह हल्का या तेज़ है? पानी पिएं और आराम करें। यदि तेज़ है तो डॉक्टर से मिलें।"
+        : "I understand you have a headache. How long have you had it? Is it mild or severe? Drink water and rest. If severe, see a doctor.";
     }
 
-    if (lowerInput.includes('fever')) {
-      return "I understand you're feeling feverish. Can you tell me your temperature if you've measured it? How long have you had the fever? Fever is often your body's way of fighting infection. Rest, stay hydrated, and monitor your temperature. You may consider acetaminophen or ibuprofen if appropriate for you. Please see a doctor if fever exceeds 103°F or persists more than 3 days.";
+    if (lowerInput.includes('fever') || lowerInput.includes('बुखार')) {
+      return currentLanguage === 'hi'
+        ? "मैं समझ सकता हूं कि आपको बुखार है। क्या आपने तापमान नापा है? आराम करें और पानी पिएं। यदि 103°F से ज्यादा है तो डॉक्टर से मिलें।"
+        : "I understand you have fever. Have you checked your temperature? Rest and drink water. If over 103°F, see a doctor.";
     }
 
     // Default response
-    return "I understand how you're feeling. Let me ask you a few questions to better help you. Can you describe your symptoms in more detail? How long have you been experiencing this? I am not a doctor, but I can help provide general health information. This is not a substitute for professional medical advice, diagnosis, or treatment. Please consult a qualified healthcare professional.";
+    return currentLanguage === 'hi'
+      ? "मैं आपकी मदद कर सकता हूं। क्या आप अपने लक्षणों के बारे में बता सकते हैं? मैं डॉक्टर नहीं हूं, लेकिन सामान्य जानकारी दे सकता हूं।"
+      : "I can help you. Can you describe your symptoms? I'm not a doctor, but I can provide general health information.";
   };
 
   const speakResponse = (text: string) => {
-    if (synthesis) {
-      setIsSpeaking(true);
+    if (!synthesis) return;
+    
+    try {
+      // Cancel any ongoing speech
+      synthesis.cancel();
+      
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9;
+      
+      // Set properties safely
+      utterance.rate = 0.8;
       utterance.pitch = 1;
+      utterance.volume = 1;
+      
+      // Set language
+      utterance.lang = currentLanguage === 'hi' ? 'hi-IN' : 'en-US';
+      
+      // Try to find appropriate voice
+      const voices = synthesis.getVoices();
+      if (voices.length > 0) {
+        if (currentLanguage === 'hi') {
+          const hindiVoice = voices.find(voice => 
+            voice.lang === 'hi-IN' || 
+            voice.lang === 'hi' || 
+            voice.name.toLowerCase().includes('hindi')
+          );
+          if (hindiVoice) {
+            utterance.voice = hindiVoice;
+          }
+        } else {
+          const englishVoice = voices.find(voice => 
+            voice.lang === 'en-US' || voice.lang.startsWith('en')
+          );
+          if (englishVoice) {
+            utterance.voice = englishVoice;
+          }
+        }
+      }
+      
+      // Set event handlers
+      utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+      
+      // Start speaking
       synthesis.speak(utterance);
+    } catch (error) {
+      console.error('Speech synthesis error:', error);
+      setIsSpeaking(false);
     }
   };
 
   const toggleListening = () => {
-    if (recognition) {
+    if (!recognition) return;
+    
+    try {
       if (isListening) {
         recognition.stop();
       } else {
         recognition.start();
         setIsListening(true);
       }
+    } catch (error) {
+      console.error('Speech recognition error:', error);
+      setIsListening(false);
     }
   };
 
   const toggleSpeaking = () => {
-    if (isSpeaking) {
-      synthesis.cancel();
+    try {
+      if (isSpeaking && synthesis) {
+        synthesis.cancel();
+        setIsSpeaking(false);
+      }
+    } catch (error) {
+      console.error('Speech cancel error:', error);
       setIsSpeaking(false);
     }
   };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full max-w-6xl mx-auto">
       <CardContent className="p-6">
-        {/* Doctor Avatar */}
-        <div className="flex items-center gap-4 mb-6">
-          <Avatar className="w-16 h-16">
-            <AvatarFallback className="bg-[#4A9B8E] text-white">
-              <Stethoscope className="w-8 h-8" />
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <h3 className="text-lg font-semibold">Virtual Medical Assistant</h3>
-            <div className="flex items-center gap-2">
-              <div className={cn("w-2 h-2 rounded-full", isSpeaking ? "bg-green-500 animate-pulse" : "bg-gray-400")} />
-              <span className="text-sm text-gray-600">
-                {isSpeaking ? "Speaking..." : isListening ? "Listening..." : "Ready"}
+        {/* Doctor Video - Only visible when speaking */}
+        <div className="flex flex-col items-center mb-6">
+          {isSpeaking && (
+            <video
+              ref={videoRef}
+              src="/pixcal.mp4"
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="h-64 sm:h-80 w-auto object-contain rounded-2xl shadow-2xl ring-4 ring-green-500 shadow-green-500/30 transition-opacity duration-200"
+              style={{
+                filter: 'blur(0.5px) brightness(1.1)',
+                transform: 'scale(1.02)'
+              }}
+            />
+          )}
+          <div className={cn("text-center", isSpeaking ? "mt-4" : "")}>
+            <h3 className="text-xl font-bold mb-2">
+              {currentLanguage === 'hi' ? 'वर्चुअल मेडिकल असिस्टेंट' : 'Virtual Medical Assistant'}
+            </h3>
+            <div className="flex items-center justify-center gap-2">
+              <div className={cn("w-3 h-3 rounded-full", isSpeaking ? "bg-green-500 animate-pulse" : "bg-gray-400")} />
+              <span className="text-base text-gray-600">
+                {currentLanguage === 'hi' 
+                  ? (isSpeaking ? "बोल रहा है..." : isListening ? "सुन रहा है..." : "मदद के लिए तैयार")
+                  : (isSpeaking ? "Speaking..." : isListening ? "Listening..." : "Ready to Help")
+                }
               </span>
             </div>
           </div>
         </div>
 
-        {/* Messages */}
-        <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
-          {messages.map((message) => (
-            <div key={message.id} className={cn("flex", message.sender === 'user' ? "justify-end" : "justify-start")}>
-              <div className={cn(
-                "max-w-[80%] rounded-lg p-3 text-sm",
-                message.sender === 'user' 
-                  ? "bg-[#4A9B8E] text-white" 
-                  : "bg-gray-100 text-gray-800"
-              )}>
-                {message.content}
-              </div>
+        {/* Latest Message Display */}
+        <div className="mb-6">
+          {messages.slice(-1).map((message) => (
+            <div key={message.id} className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <p className="text-base text-gray-800 leading-relaxed">{message.content}</p>
             </div>
           ))}
         </div>
@@ -159,29 +244,43 @@ export default function VirtualDoctorAvatar() {
             onClick={toggleListening}
             disabled={!recognition}
             className={cn(
-              "flex items-center gap-2",
+              "flex items-center gap-2 px-6 py-3",
               isListening ? "bg-red-500 hover:bg-red-600" : "bg-[#4A9B8E] hover:bg-[#4A9B8E]/90"
             )}
           >
-            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            {isListening ? "Stop" : "Speak"}
+            {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            {currentLanguage === 'hi' 
+              ? (isListening ? "सुनना बंद करें" : "बोलना शुरू करें")
+              : (isListening ? "Stop Listening" : "Start Speaking")
+            }
           </Button>
           
           <Button
             onClick={toggleSpeaking}
             variant="outline"
             disabled={!isSpeaking}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 px-6 py-3"
           >
-            {isSpeaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-            {isSpeaking ? "Mute" : "Audio"}
+            {isSpeaking ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            {currentLanguage === 'hi'
+              ? (isSpeaking ? "डॉक्टर को म्यूट करें" : "आवाज़ चालू")
+              : (isSpeaking ? "Mute Doctor" : "Audio On")
+            }
+          </Button>
+
+          <Button
+            onClick={() => setCurrentLanguage(currentLanguage === 'hi' ? 'en' : 'hi')}
+            variant="outline"
+            className="flex items-center gap-2 px-4 py-3"
+          >
+            <Globe className="w-5 h-5" />
+            {currentLanguage === 'hi' ? 'हिं' : 'EN'}
           </Button>
         </div>
 
-        {/* Status */}
         <div className="mt-4 text-center">
-          <Badge variant="secondary" className="text-xs">
-            Voice-Enabled Medical Assistant
+          <Badge variant="secondary" className="text-sm px-3 py-1">
+            🩺 {currentLanguage === 'hi' ? 'एआई डॉक्टर • आवाज़-सक्षम • रियल-टाइम परामर्श' : 'AI Doctor • Voice-Enabled • Real-time Consultation'}
           </Badge>
         </div>
       </CardContent>

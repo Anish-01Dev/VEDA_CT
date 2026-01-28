@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/language-context";
 
 interface LanguageToggleProps {
   className?: string;
@@ -16,7 +17,7 @@ const languages = [
 ];
 
 export function LanguageToggle({ className }: LanguageToggleProps) {
-  const [currentLang, setCurrentLang] = useState("hi");
+  const { currentLanguage, setLanguage } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -33,7 +34,7 @@ export function LanguageToggle({ className }: LanguageToggleProps) {
         >
           <Globe className="w-4 h-4 mr-1" />
           <span className="font-medium">
-            {languages.find(l => l.code === currentLang)?.label}
+            {languages.find(l => l.code === currentLanguage)?.label}
           </span>
         </Button>
       </motion.div>
@@ -51,12 +52,12 @@ export function LanguageToggle({ className }: LanguageToggleProps) {
               whileHover={{ backgroundColor: "hsl(var(--primary) / 0.1)" }}
               whileTap={{ scale: 0.98 }}
               onClick={() => {
-                setCurrentLang(lang.code);
+                setLanguage(lang.code as any);
                 setIsOpen(false);
               }}
               className={cn(
                 "w-full px-4 py-3 text-left flex items-center gap-2 transition-colors first:rounded-t-xl last:rounded-b-xl",
-                currentLang === lang.code && "bg-primary/10 text-primary font-medium"
+                currentLanguage === lang.code && "bg-primary/10 text-primary font-medium"
               )}
             >
               <span>{lang.flag}</span>

@@ -11,6 +11,7 @@ import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Bot, Activity, Heart } from "lucide-react";
+import { useLanguage } from "@/contexts/language-context";
 
 // Import new components
 import { AppTitleBar } from "@/components/layout/app-title-bar";
@@ -34,6 +35,7 @@ const Index = () => {
   useSmoothScroll();
   const mainRef = useRef<HTMLElement>(null);
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   // Enhanced animation setup
   useEffect(() => {
@@ -68,7 +70,7 @@ const Index = () => {
       <AnimatePresence mode="wait">
         <div className="min-h-screen bg-[#FEFCF3] pb-24 relative overflow-hidden flex flex-col font-inter">
           {/* Dashboard Header at the top */}
-          <DashboardHeader currentLanguage="English" />
+          <DashboardHeader />
 
           <main ref={mainRef} className="flex flex-col w-full max-w-6xl mx-auto px-4 sm:px-8 py-6 sm:py-10 gap-10">
             {/* Hero Section with Logo */}
@@ -76,74 +78,19 @@ const Index = () => {
 
             {/* Quick Health Check Section */}
             <section className="w-full bg-[#F8F5F0] rounded-2xl p-6 mb-6">
-              <h2 className="text-2xl font-bold text-[#2D3748] font-nunito mb-6">Quick Health Check</h2>
+              <h2 className="text-2xl font-bold text-[#2D3748] font-nunito mb-6">{t('quick.health.check')}</h2>
               <QuickActionsSection />
             </section>
 
             {/* Health Modules Section */}
             <section className="w-full bg-[#F8F5F0] rounded-2xl p-6">
-              <h2 className="text-2xl font-bold text-[#2D3748] font-nunito mb-6">Health Modules</h2>
+              <h2 className="text-2xl font-bold text-[#2D3748] font-nunito mb-6">{t('health.modules')}</h2>
               <HealthMetricsSection />
-            </section>
-
-            {/* Enhanced Features Showcase */}
-            <section className="w-full bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl p-6 mb-6">
-              <h2 className="text-3xl font-bold text-center mb-4 text-[#2D3748] font-nunito">🚀 Enhanced Features</h2>
-              <p className="text-xl text-center text-gray-600 mb-8">Experience the next generation of healthcare technology</p>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                <div className="bg-white rounded-xl shadow-lg p-6">
-                  <h3 className="text-xl font-bold mb-3 flex items-center gap-2 text-[#2D3748]">
-                    <Activity className="w-5 h-5 text-blue-600" />
-                    Enhanced Symptom Checker
-                  </h3>
-                  <p className="text-gray-600 mb-3 text-sm">
-                    Advanced AI-powered symptom analysis with comprehensive medical database,
-                    emergency detection, and personalized treatment recommendations.
-                  </p>
-                  <ul className="space-y-1 text-xs text-gray-600">
-                    <li>• Real-time emergency symptom detection</li>
-                    <li>• Comprehensive medical condition database</li>
-                    <li>• Severity tracking and duration analysis</li>
-                    <li>• Evidence-based treatment recommendations</li>
-                  </ul>
-                </div>
-
-                <div className="bg-white rounded-xl shadow-lg p-6">
-                  <h3 className="text-xl font-bold mb-3 flex items-center gap-2 text-[#2D3748]">
-                    <Heart className="w-5 h-5 text-red-600" />
-                    Health Dashboard
-                  </h3>
-                  <p className="text-gray-600 mb-3 text-sm">
-                    Comprehensive health monitoring with vital signs tracking,
-                    medication management, and predictive analytics.
-                  </p>
-                  <ul className="space-y-1 text-xs text-gray-600">
-                    <li>• Real-time vital signs monitoring</li>
-                    <li>• Medication compliance tracking</li>
-                    <li>• Health trend analytics</li>
-                    <li>• Predictive health insights</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="text-center">
-                <Button
-                  size="lg"
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 mr-4"
-                  onClick={() => navigate("/virtual-doctor")}
-                >
-                  Try Virtual Doctor
-                </Button>
-                <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                  Explore All Features
-                </Button>
-              </div>
             </section>
 
             {/* API Test Section - Temporary for debugging */}
             <section className="w-full bg-[#F8F5F0] rounded-2xl p-6">
-              <h2 className="text-2xl font-bold text-[#2D3748] font-nunito mb-6">API Connection Test</h2>
+              <h2 className="text-2xl font-bold text-[#2D3748] font-nunito mb-6">{t('api.connection.test')}</h2>
               <ApiTestComponent />
             </section>
           </main>

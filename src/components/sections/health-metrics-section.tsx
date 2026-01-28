@@ -57,7 +57,7 @@ export function HealthMetricsSection() {
         >
           <HealthMetricsCard 
             metrics={mockHealthMetrics} 
-            className="mb-8 sm:mb-12 lg:mb-16 shadow-2xl rounded-3xl p-6 sm:p-8 lg:p-10 border border-border/50 bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-lg card-elevated" 
+            className="shadow-lg rounded-2xl p-4 border border-border/50 bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-lg" 
           />
         </motion.div>
       </ErrorBoundary>

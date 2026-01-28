@@ -1,9 +1,13 @@
-
 import { motion } from "framer-motion";
-import { Shield, Wifi, Sparkles } from "lucide-react";
+import { Shield, Wifi, Sparkles, ArrowRight, Zap } from "lucide-react";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
+import { useLanguage } from "@/contexts/language-context";
 
 export function HeroSection() {
+  const { t } = useLanguage();
+  
   return (
     <motion.section
       className="hero-section motion-card fade-on-scroll"
@@ -26,29 +30,37 @@ export function HeroSection() {
 
           {/* Text Content (Left Side) - Now First in DOM */}
           <div className="text-left order-2 lg:order-1">
-            <motion.h1
-              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold text-foreground mb-10  sm:mb-10 lg:mb-10 text-gradient leading-tight word-wrap"
-              initial={{ opacity: 0, scale: 0.7, x: -50 }}
-              animate={{ opacity: 1, scale: 1, x: 0 }}
-              transition={{ delay: 0.3, type: "spring", stiffness: 200, damping: 20 }}
-              whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-            >
-              Pixal Health
-            </motion.h1>
+            <div className="z-10">
+              <div className="inline-flex items-center gap-2 mb-6 px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
+                <Zap className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium text-primary">
+                  {t('healthcare.without.barriers')}
+                </span>
+              </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="space-y-4 sm:space-y-6"
-            >
-              <p className="text-muted-foreground text-xl sm:text-2xl md:text-3xl lg:text-4xl leading-relaxed word-wrap break-words">
-                आपका AI-संचालित स्वास्थ्य साथी बेहतर कल्याण के लिए
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground mb-6 text-balance leading-tight">
+                {t('healthcare.without.barriers')}
+              </h1>
+
+              <p className="text-lg text-muted-foreground mb-8 text-balance">
+                {t('ai.powered.triage')}
               </p>
-              <p className="text-muted-foreground/80 text-lg sm:text-xl md:text-2xl leading-relaxed word-wrap break-words">
-                Your AI-powered healthcare companion for better wellness
-              </p>
-            </motion.div>
+
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Link to="/virtual-doctor">
+                  <Button className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
+                    {t('try.virtual.doctor')}
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </Link>
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto border-primary text-primary hover:bg-primary/5 bg-transparent"
+                >
+                  {t('watch.how.works')}
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Video (Right Side) - Now Second in DOM */}
@@ -65,7 +77,7 @@ export function HeroSection() {
               loop
               muted
               playsInline
-              className="h-56 sm:h-64 md:h-72 lg:h-80 xl:h-96 w-auto object-contain drop-shadow-2xl rounded-3xl"
+              className="h-48 sm:h-72 md:h-80 lg:h-[24rem] xl:h-[30rem] w-auto object-contain drop-shadow-2xl rounded-3xl"
             />
           </motion.div>
         </div>

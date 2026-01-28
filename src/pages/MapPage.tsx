@@ -18,6 +18,7 @@ import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/navigation/bottom-nav";
 import { cn } from "@/lib/utils";
 import { navItems } from "@/lib/navigation-config";
+import { osmService, type MedicalFacility } from "@/lib/osm-service";
 
 interface HealthcareProvider {
   id: string;
@@ -84,13 +85,15 @@ const mockProviders: HealthcareProvider[] = [
 const typeColors = {
   hospital: "bg-[#E53E3E20] text-[#E53E3E] border-[#E53E3E]/20",
   clinic: "bg-[#4A9B8E20] text-[#4A9B8E] border-[#4A9B8E]/20",
+  doctor: "bg-[#4A9B8E20] text-[#4A9B8E] border-[#4A9B8E]/20",
   pharmacy: "bg-[#3182CE20] text-[#3182CE] border-[#3182CE]/20",
   "jan-aushadhi": "bg-[#38A16920] text-[#38A169] border-[#38A169]/20"
 };
 
 const typeLabels = {
   hospital: "Hospital",
-  clinic: "Clinic", 
+  clinic: "Clinic",
+  doctor: "Doctor", 
   pharmacy: "Pharmacy",
   "jan-aushadhi": "Jan Aushadhi"
 };
@@ -101,35 +104,97 @@ const MapPage = () => {
   const [selectedType, setSelectedType] = useState<string>("all");
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [realFacilities, setRealFacilities] = useState<MedicalFacility[]>([]);
+  const [isLoadingRealData, setIsLoadingRealData] = useState(false);
 
-  const filteredProviders = mockProviders.filter(provider => {
-    const matchesSearch = provider.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         provider.address.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = selectedType === "all" || provider.type === selectedType;
-    return matchesSearch && matchesType;
-  });
+  const filteredProviders = realFacilities.length > 0 
+    ? realFacilities.map(facility => ({
+        id: facility.id,
+        name: facility.name,
+        type: facility.type as "hospital" | "clinic" | "pharmacy" | "jan-aushadhi",
+        address: facility.address || 'Address not available',
+        distance: facility.distance < 1 
+          ? `${Math.round(facility.distance * 1000)}m` 
+          : `${facility.distance.toFixed(1)}km`,
+        rating: 4.0,
+        hours: 'Hours not available',
+        isOpen: true,
+        phone: undefined
+      })).filter(provider => {
+        const matchesSearch = provider.name.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesType = selectedType === "all" || provider.type === selectedType;
+        return matchesSearch && matchesType;
+      })
+    : mockProviders.filter(provider => {
+        const matchesSearch = provider.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                             provider.address.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesType = selectedType === "all" || provider.type === selectedType;
+        return matchesSearch && matchesType;
+      });
 
   const requestLocation = () => {
+    console.log('Requesting location...');
     setIsLoadingLocation(true);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-          setIsLoadingLocation(false);
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-          setIsLoadingLocation(false);
-        }
-      );
+    
+    if (!navigator.geolocation) {
+      console.error('Geolocation not supported');
+      alert('Geolocation is not supported by this browser.');
+      setIsLoadingLocation(false);
+      return;
     }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        console.log('Location obtained:', position.coords);
+        const location = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        setUserLocation(location);
+        setIsLoadingLocation(false);
+        
+        // Fetch real data from OpenStreetMap
+        setIsLoadingRealData(true);
+        try {
+          const facilities = await osmService.findNearbyMedicalFacilities(
+            location.lat, 
+            location.lng
+          );
+          console.log('Facilities found:', facilities);
+          setRealFacilities(facilities);
+        } catch (error) {
+          console.error('Error fetching real facilities:', error);
+        } finally {
+          setIsLoadingRealData(false);
+        }
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        let errorMsg = 'Location access failed';
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMsg = 'Location access denied. Please enable location in browser settings.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMsg = 'Location information unavailable.';
+            break;
+          case error.TIMEOUT:
+            errorMsg = 'Location request timed out.';
+            break;
+        }
+        alert(errorMsg);
+        setIsLoadingLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 60000
+      }
+    );
   };
 
   useEffect(() => {
-    requestLocation();
+    // Don't auto-request location on page load
   }, []);
 
   return (
@@ -203,7 +268,7 @@ const MapPage = () => {
                 >
                   All
                 </Button>
-                {Object.entries(typeLabels).map(([type, label]) => (
+                {['hospital', 'clinic', 'doctor', 'pharmacy'].map((type) => (
                   <Button
                     key={type}
                     variant={selectedType === type ? "default" : "outline"}
@@ -215,7 +280,7 @@ const MapPage = () => {
                         : 'border-[#E2E8F0] hover:bg-[#F8F5F0] text-[#2D3748]'
                     }`}
                   >
-                    {label}
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
                   </Button>
                 ))}
               </div>
@@ -227,15 +292,25 @@ const MapPage = () => {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-[#2D3748] font-nunito">
-                    {userLocation ? "Location Found" : "Getting Location..."}
+                    {userLocation ? "Location Found" : "Location Required"}
                   </p>
                   <p className="text-xs text-[#4A5568] font-inter">
                     {userLocation 
                       ? `Lat: ${userLocation.lat.toFixed(4)}, Lng: ${userLocation.lng.toFixed(4)}`
-                      : "Please allow location access"
+                      : "Click to enable location access"
                     }
                   </p>
                 </div>
+                {!userLocation && (
+                  <Button 
+                    onClick={requestLocation} 
+                    disabled={isLoadingLocation}
+                    size="sm"
+                    className="bg-[#4A9B8E] hover:bg-[#4A9B8E]/90"
+                  >
+                    {isLoadingLocation ? "Getting..." : "Enable"}
+                  </Button>
+                )}
                 {isLoadingLocation && (
                   <div className="w-4 h-4 border-2 border-[#4A9B8E]/30 border-t-[#4A9B8E] rounded-full animate-spin" />
                 )}
@@ -326,12 +401,29 @@ const MapPage = () => {
                     {/* Actions */}
                     <div className="flex gap-2 pt-2 border-t border-[#E2E8F0]">
                       {provider.phone && (
-                        <Button variant="outline" size="sm" className="flex-1 border-[#E2E8F0] hover:bg-[#F8F5F0]">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1 border-[#E2E8F0] hover:bg-[#F8F5F0]"
+                          onClick={() => window.open(`tel:${provider.phone}`, '_self')}
+                        >
                           <Phone className="w-4 h-4 mr-2" />
                           Call
                         </Button>
                       )}
-                      <Button variant="outline" size="sm" className="flex-1 border-[#E2E8F0] hover:bg-[#F8F5F0]">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1 border-[#E2E8F0] hover:bg-[#F8F5F0]"
+                        onClick={() => {
+                          const facility = realFacilities.find(f => f.id === provider.id);
+                          if (facility) {
+                            window.open(`https://www.google.com/maps/dir/?api=1&destination=${facility.lat},${facility.lon}`, '_blank');
+                          } else {
+                            window.open(`https://www.google.com/maps/search/${encodeURIComponent(provider.name + ' ' + provider.address)}`, '_blank');
+                          }
+                        }}
+                      >
                         <Navigation className="w-4 h-4 mr-2" />
                         Directions
                       </Button>
