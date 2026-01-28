@@ -1,0 +1,135 @@
+
+/* Enhanced Healthcare Animations & Keyframes */
+
+/* Enhanced Keyframe Animations */
+@keyframes pulse-heart {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes shimmer-enhanced {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes float-gentle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes recording-pulse {
+  0%, 100% {
+    background-color: hsl(var(--health-critical));
+    box-shadow: 0 0 0 0 hsl(var(--health-critical) / 0.7);
+  }
+  50% {
+    background-color: hsl(var(--health-critical) / 0.8);
+    box-shadow: 0 0 0 10px hsl(var(--health-critical) / 0);
+  }
+}
+
+@layer utilities {
+  .pulse-heart {
+    animation: pulse-heart 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  .shimmer-loading {
+    background: linear-gradient(90deg, 
+      hsl(var(--muted)) 25%, 
+      hsl(var(--background)) 50%, 
+      hsl(var(--muted)) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+  
+  .float-gentle {
+    animation: float-gentle 3s ease-in-out infinite;
+  }
+
+  /* Enhanced Recording State */
+  .recording-pulse {
+    animation: recording-pulse 1.5s ease-in-out infinite;
+  }
+
+  /* Enhanced Animation Classes */
+  .motion-card {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    will-change: transform, opacity;
+  }
+
+  .fade-on-scroll {
+    opacity: 1;
+    transform: translateY(0);
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .slide-in {
+    opacity: 1;
+    transform: translateX(0);
+    transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .fade-in-up {
+    opacity: 1;
+    transform: translateY(0);
+    transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .scroll-trigger {
+    opacity: 1;
+    transform: scale(1);
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Enhanced Loading States */
+  .shimmer-enhanced {
+    background: linear-gradient(90deg,
+      hsl(var(--muted) / 0.5) 25%,
+      hsl(var(--primary) / 0.1) 50%,
+      hsl(var(--muted) / 0.5) 75%);
+    background-size: 200% 100%;
+    animation: shimmer-enhanced 2.5s infinite;
+  }
+}
+
+/* Enhanced Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .motion-card,
+  .fade-on-scroll,
+  .slide-in,
+  .fade-in-up,
+  .scroll-trigger {
+    transition: none;
+    animation: none;
+  }
+  
+  .shimmer-loading,
+  .shimmer-enhanced {
+    animation: none;
+    background: hsl(var(--muted));
+  }
+}

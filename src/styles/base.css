@@ -1,0 +1,81 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Brand Colors & Theme */
+@layer base {
+  :root {
+    /* Brand Colors */
+    --primary: 154 36% 45%; /* #4A9B8E */
+    --primary-foreground: 0 0% 100%; /* #FFFFFF */
+    --accent: 174 56% 38%; /* #2A9D8F */
+    --secondary: 28 86% 67%; /* #F4A261 */
+    --secondary-foreground: 0 0% 100%; /* #FFFFFF */
+
+    /* Backgrounds */
+    --background: 44 100% 98%; /* #FEFCF3 */
+    --card: 0 0% 100%; /* #FFFFFF */
+    --popover: 44 44% 97%; /* #F8F5F0 */
+    --overlay: 0 0% 0% / 0.4; /* rgba(0,0,0,0.4) */
+
+    /* Text */
+    --foreground: 221 28% 23%; /* #2D3748 */
+    --text-primary: 221 28% 23%; /* #2D3748 */
+    --text-secondary: 218 13% 34%; /* #4A5568 */
+    --text-muted: 218 11% 51%; /* #718096 */
+    --text-inverse: 0 0% 100%; /* #FFFFFF */
+
+    /* Status */
+    --status-success: 134 53% 44%; /* #38A169 */
+    --status-warning: 45 65% 52%; /* #D69E2E */
+    --status-error: 0 74% 58%; /* #E53E3E */
+    --status-info: 217 79% 46%; /* #3182CE */
+
+    /* Health */
+    --health-mild: 134 53% 64%; /* #68D391 */
+    --health-moderate: 51 94% 66%; /* #F6E05E */
+    --health-severe: 2 92% 74%; /* #FC8181 */
+    --health-critical: 0 74% 58%; /* #E53E3E */
+
+    /* UI Elements */
+    --border: 210 16% 90%; /* #E2E8F0 */
+    --shadow: 0 0% 0% / 0.1; /* rgba(0,0,0,0.1) */
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, #4A9B8E, #2A9D8F);
+    --gradient-secondary: linear-gradient(135deg, #F4A261, #E76F51);
+    --gradient-health: linear-gradient(135deg, #68D391, #38A169);
+
+    /* Misc */
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 221 39% 11%; /* #1A202C */
+    --foreground: 0 0% 100%; /* #FFFFFF */
+    --card: 221 39% 13%; /* #232B3A */
+    --popover: 221 39% 15%; /* #2D3748 */
+    --primary: 154 36% 45%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 174 56% 38%;
+    --secondary: 28 86% 67%;
+    --secondary-foreground: 0 0% 100%;
+    --text-primary: 0 0% 100%;
+    --text-secondary: 218 13% 70%;
+    --text-muted: 218 11% 60%;
+    --text-inverse: 221 39% 11%;
+    --border: 221 16% 25%;
+    --shadow: 0 0% 0% / 0.3;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}

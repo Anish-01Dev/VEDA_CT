@@ -1,0 +1,14 @@
+
+/* Vaidyāna Healthcare Design System - Main Entry Point */
+
+/* Import base styles and CSS variables */
+@import url('./styles/base.css');
+
+/* Import animation utilities and keyframes */
+@import url('./styles/animations.css');
+
+/* Import component-specific utilities */
+@import url('./styles/components.css');
+
+/* Import responsive and mobile utilities */
+@import url('./styles/responsive.css');
