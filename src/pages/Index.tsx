@@ -39,11 +39,11 @@ const Index = () => {
   useEffect(() => {
     if (mainRef.current) {
       const tl = gsap.timeline();
-      
+
       // Animate the main content sections
       const sections = mainRef.current.querySelectorAll("section");
       const headings = mainRef.current.querySelectorAll("h2");
-      
+
       if (sections.length > 0) {
         tl.fromTo(
           sections,
@@ -51,7 +51,7 @@ const Index = () => {
           { y: 0, opacity: 1, duration: 0.6, ease: "power3.out", stagger: 0.2 }
         );
       }
-      
+
       if (headings.length > 0) {
         tl.fromTo(
           headings,
@@ -90,7 +90,7 @@ const Index = () => {
             <section className="w-full bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl p-6 mb-6">
               <h2 className="text-3xl font-bold text-center mb-4 text-[#2D3748] font-nunito">🚀 Enhanced Features</h2>
               <p className="text-xl text-center text-gray-600 mb-8">Experience the next generation of healthcare technology</p>
-              
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div className="bg-white rounded-xl shadow-lg p-6">
                   <h3 className="text-xl font-bold mb-3 flex items-center gap-2 text-[#2D3748]">
@@ -98,7 +98,7 @@ const Index = () => {
                     Enhanced Symptom Checker
                   </h3>
                   <p className="text-gray-600 mb-3 text-sm">
-                    Advanced AI-powered symptom analysis with comprehensive medical database, 
+                    Advanced AI-powered symptom analysis with comprehensive medical database,
                     emergency detection, and personalized treatment recommendations.
                   </p>
                   <ul className="space-y-1 text-xs text-gray-600">
@@ -108,14 +108,14 @@ const Index = () => {
                     <li>• Evidence-based treatment recommendations</li>
                   </ul>
                 </div>
-                
+
                 <div className="bg-white rounded-xl shadow-lg p-6">
                   <h3 className="text-xl font-bold mb-3 flex items-center gap-2 text-[#2D3748]">
                     <Heart className="w-5 h-5 text-red-600" />
                     Health Dashboard
                   </h3>
                   <p className="text-gray-600 mb-3 text-sm">
-                    Comprehensive health monitoring with vital signs tracking, 
+                    Comprehensive health monitoring with vital signs tracking,
                     medication management, and predictive analytics.
                   </p>
                   <ul className="space-y-1 text-xs text-gray-600">
@@ -126,10 +126,10 @@ const Index = () => {
                   </ul>
                 </div>
               </div>
-              
+
               <div className="text-center">
-                <Button 
-                  size="lg" 
+                <Button
+                  size="lg"
                   className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 mr-4"
                   onClick={() => navigate("/virtual-doctor")}
                 >
@@ -153,9 +153,9 @@ const Index = () => {
             className="fixed bottom-20 right-4 sm:bottom-24 sm:right-6 z-50"
             initial={{ scale: 0, opacity: 0, y: 50 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
-            transition={{ 
-              type: "spring", 
-              stiffness: 260, 
+            transition={{
+              type: "spring",
+              stiffness: 260,
               damping: 20,
               delay: 1.0
             }}
@@ -163,12 +163,12 @@ const Index = () => {
             <motion.button
               onClick={() => navigate("/chat")}
               className="group relative w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-[#4A9B8E] to-[#2A9D8F] hover:from-[#2A9D8F] hover:to-[#4A9B8E] text-white rounded-full shadow-2xl shadow-[#4A9B8E]/30 border-2 border-white/20 backdrop-blur-sm transition-all duration-300 flex items-center justify-center overflow-hidden"
-              whileHover={{ 
+              whileHover={{
                 scale: 1.1,
                 y: -3,
                 transition: { duration: 0.2 }
               }}
-              whileTap={{ 
+              whileTap={{
                 scale: 0.9,
                 y: 0,
                 transition: { duration: 0.1 }
@@ -179,10 +179,10 @@ const Index = () => {
                 <div className="absolute inset-0 bg-white/20 rounded-full blur-sm animate-pulse"></div>
                 <Bot className="relative w-8 h-8 sm:w-10 sm:h-10 text-white drop-shadow-sm" />
               </div>
-              
+
               {/* Hover glow effect */}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 rounded-full"></div>
-              
+
               {/* Pulse ring for attention */}
               <motion.div
                 className="absolute inset-0 rounded-full border-2 border-white/30"
@@ -197,7 +197,7 @@ const Index = () => {
                 }}
               />
             </motion.button>
-            
+
             {/* Floating notification dot */}
             <motion.div
               className="absolute -top-1 -right-1 w-3 h-3 bg-[#F6E05E] rounded-full border-2 border-white shadow-lg"

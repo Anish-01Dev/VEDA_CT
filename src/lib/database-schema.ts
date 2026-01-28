@@ -631,12 +631,12 @@ class DatabaseManager {
   // Database maintenance
   async backup(): Promise<void> {
     const data = await this.exportData();
-    localStorage.setItem('vaidyana_backup', data);
+    localStorage.setItem('pixal_health_backup', data);
     console.log('✅ Database backup created');
   }
 
   async restore(): Promise<void> {
-    const backup = localStorage.getItem('vaidyana_backup');
+    const backup = localStorage.getItem('pixal_health_backup');
     if (backup) {
       await this.importData(backup);
       console.log('✅ Database restored from backup');

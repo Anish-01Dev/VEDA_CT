@@ -1,8 +1,8 @@
-# Vaidyāna - The Healing Intelligence 🏥
+# Pixal Health - The Healing Intelligence 🏥
 
 <div align="center">
 
-![Vaidyāna Logo](https://img.shields.io/badge/Vaidyāna-Healthcare%20AI-blue?style=for-the-badge&logo=heart)
+![Pixal Health Logo](https://img.shields.io/badge/Pixal Health-Healthcare%20AI-blue?style=for-the-badge&logo=heart)
 ![React](https://img.shields.io/badge/React-18.0+-61DAFB?style=for-the-badge&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=for-the-badge&logo=typescript)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-3.0+-38B2AC?style=for-the-badge&logo=tailwind-css)
@@ -19,7 +19,7 @@
 
 ## 🎯 **Project Overview**
 
-**Vaidyāna** (वैद्यान) is a **comprehensive, production-ready AI-powered healthcare platform** that has been transformed into a world-class medical intelligence system. Named after the ancient Sanskrit word for "medical knowledge," our platform combines cutting-edge AI technology with a comprehensive medical database to provide **real-time health analysis, emergency detection, and personalized medical guidance**.
+**Pixal Health** (वैद्यान) is a **comprehensive, production-ready AI-powered healthcare platform** that has been transformed into a world-class medical intelligence system. Named after the ancient Sanskrit word for "medical knowledge," our platform combines cutting-edge AI technology with a comprehensive medical database to provide **real-time health analysis, emergency detection, and personalized medical guidance**.
 
 ### 🎯 **Mission**
 To democratize access to quality healthcare through AI-powered medical intelligence, making professional-grade health analysis accessible to everyone, especially in regions where medical resources are limited.
