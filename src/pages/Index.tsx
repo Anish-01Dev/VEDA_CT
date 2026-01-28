@@ -128,6 +128,13 @@ const Index = () => {
               </div>
               
               <div className="text-center">
+                <Button 
+                  size="lg" 
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 mr-4"
+                  onClick={() => navigate("/virtual-doctor")}
+                >
+                  Try Virtual Doctor
+                </Button>
                 <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
                   Explore All Features
                 </Button>
