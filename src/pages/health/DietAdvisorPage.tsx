@@ -10,6 +10,8 @@ import { ArrowLeft, Apple, Utensils, Target, TrendingUp, Camera, Upload, BarChar
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/navigation/bottom-nav";
 import { navItems } from "@/lib/navigation-config";
+import { aiClient } from "@/lib/ai-client";
+import { aiLogger } from "@/lib/ai-logger";
 
 
 
@@ -87,6 +89,8 @@ const DietAdvisorPage = () => {
   const analyzeFood = async () => {
     if (!selectedImage) return;
     setIsAnalyzing(true);
+    
+    aiLogger.aiStart('Diet Advisor', 'Food Analysis', selectedImage.name);
     
     try {
       const API_KEY = import.meta.env.VITE_GOOGLE_AI_STUDIO_KEY;
@@ -181,8 +185,13 @@ const DietAdvisorPage = () => {
       console.log('✅ Parsed Analysis:', parsed);
       
       setFoodAnalysis(parsed);
+      aiLogger.aiSuccess('Diet Advisor', 'Food Analysis', { 
+        food: parsed.name, 
+        calories: parsed.calories 
+      });
       
     } catch (error) {
+      aiLogger.aiError('Diet Advisor', 'Food Analysis', error);
       console.error('❌ Food analysis failed:', error);
       setFoodAnalysis(null);
       alert(`Analysis failed: ${error.message}. Check console for details.`);
@@ -195,6 +204,19 @@ const DietAdvisorPage = () => {
     if (!profile.age || !profile.weight || !profile.height || !profile.activity || !profile.goal) return;
     
     setIsGenerating(true);
+    
+    const profileData = {
+      age: profile.age,
+      weight: profile.weight,
+      height: profile.height,
+      activity: profile.activity,
+      goal: profile.goal,
+      dietary: profile.dietary,
+      medical: profile.medicalCondition,
+      allergies: profile.allergies
+    };
+    
+    aiLogger.aiStart('Diet Advisor', 'Meal Plan Generation', profileData);
     
     try {
       const API_KEY = import.meta.env.VITE_GOOGLE_AI_STUDIO_KEY;
@@ -254,7 +276,12 @@ const DietAdvisorPage = () => {
       console.log('✅ Parsed Meal Plan:', parsed);
       
       setMealPlan(parsed);
+      aiLogger.aiSuccess('Diet Advisor', 'Meal Plan Generation', { 
+        calories: parsed.dailyCalories,
+        meals: Object.keys(parsed.meals || {}).length 
+      });
     } catch (error) {
+      aiLogger.aiError('Diet Advisor', 'Meal Plan Generation', error);
       console.error('❌ Meal plan generation failed:', error);
       setMealPlan(null);
       alert(`Meal plan generation failed: ${error.message}. Please try again.`);

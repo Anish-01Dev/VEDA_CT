@@ -9,6 +9,7 @@
     /* Brand Colors */
     --primary: 154 36% 45%; /* #4A9B8E */
     --primary-foreground: 0 0% 100%; /* #FFFFFF */
+    --primary-glow: 154 36% 55%; /* Lighter primary */
     --accent: 174 56% 38%; /* #2A9D8F */
     --secondary: 28 86% 67%; /* #F4A261 */
     --secondary-foreground: 0 0% 100%; /* #FFFFFF */
@@ -16,7 +17,9 @@
     /* Backgrounds */
     --background: 44 100% 98%; /* #FEFCF3 */
     --card: 0 0% 100%; /* #FFFFFF */
+    --card-foreground: 221 28% 23%; /* #2D3748 */
     --popover: 44 44% 97%; /* #F8F5F0 */
+    --popover-foreground: 221 28% 23%; /* #2D3748 */
     --overlay: 0 0% 0% / 0.4; /* rgba(0,0,0,0.4) */
 
     /* Text */
@@ -25,22 +28,47 @@
     --text-secondary: 218 13% 34%; /* #4A5568 */
     --text-muted: 218 11% 51%; /* #718096 */
     --text-inverse: 0 0% 100%; /* #FFFFFF */
+    --muted: 210 16% 90%; /* #E2E8F0 */
+    --muted-foreground: 218 11% 51%; /* #718096 */
+
+    /* Form Elements */
+    --input: 210 16% 90%; /* #E2E8F0 */
+    --ring: 154 36% 45%; /* #4A9B8E */
 
     /* Status */
+    --destructive: 0 74% 58%; /* #E53E3E */
+    --destructive-foreground: 0 0% 100%; /* #FFFFFF */
     --status-success: 134 53% 44%; /* #38A169 */
     --status-warning: 45 65% 52%; /* #D69E2E */
     --status-error: 0 74% 58%; /* #E53E3E */
     --status-info: 217 79% 46%; /* #3182CE */
 
     /* Health */
+    --health-good: 134 53% 64%; /* #68D391 */
+    --health-warning: 51 94% 66%; /* #F6E05E */
+    --health-critical: 0 74% 58%; /* #E53E3E */
+    --health-mental: 174 56% 38%; /* #2A9D8F */
     --health-mild: 134 53% 64%; /* #68D391 */
     --health-moderate: 51 94% 66%; /* #F6E05E */
     --health-severe: 2 92% 74%; /* #FC8181 */
-    --health-critical: 0 74% 58%; /* #E53E3E */
+
+    /* Additional Colors */
+    --coral: 28 86% 67%; /* #F4A261 */
+    --coral-foreground: 0 0% 100%; /* #FFFFFF */
 
     /* UI Elements */
     --border: 210 16% 90%; /* #E2E8F0 */
     --shadow: 0 0% 0% / 0.1; /* rgba(0,0,0,0.1) */
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%; /* #FFFFFF */
+    --sidebar-foreground: 221 28% 23%; /* #2D3748 */
+    --sidebar-primary: 154 36% 45%; /* #4A9B8E */
+    --sidebar-primary-foreground: 0 0% 100%; /* #FFFFFF */
+    --sidebar-accent: 210 16% 90%; /* #E2E8F0 */
+    --sidebar-accent-foreground: 221 28% 23%; /* #2D3748 */
+    --sidebar-border: 210 16% 90%; /* #E2E8F0 */
+    --sidebar-ring: 154 36% 45%; /* #4A9B8E */
 
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, #4A9B8E, #2A9D8F);

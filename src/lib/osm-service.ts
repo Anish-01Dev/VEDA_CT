@@ -94,6 +94,52 @@ class OpenStreetMapService {
     if (tags['addr:city']) parts.push(tags['addr:city']);
     return parts.join(', ') || 'Address not available';
   }
+
+  async findNearbyPharmacies(lat: number, lon: number, radius: number = 5000): Promise<MedicalFacility[]> {
+    const query = `
+      [out:json][timeout:25];
+      (
+        node["amenity"="pharmacy"](around:${radius},${lat},${lon});
+        way["amenity"="pharmacy"](around:${radius},${lat},${lon});
+      );
+      out center;
+    `;
+
+    try {
+      const response = await fetch(this.OVERPASS_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: query
+      });
+
+      const data = await response.json();
+      const pharmacies: MedicalFacility[] = [];
+
+      data.elements.forEach((element: any) => {
+        const facilityLat = element.lat || element.center?.lat;
+        const facilityLon = element.lon || element.center?.lon;
+        
+        if (facilityLat && facilityLon) {
+          const distance = this.calculateDistance(lat, lon, facilityLat, facilityLon);
+          
+          pharmacies.push({
+            id: element.id.toString(),
+            name: element.tags?.name || 'Pharmacy',
+            type: 'pharmacy',
+            lat: facilityLat,
+            lon: facilityLon,
+            distance: Math.round(distance * 100) / 100,
+            address: this.buildAddress(element.tags)
+          });
+        }
+      });
+
+      return pharmacies.sort((a, b) => a.distance - b.distance);
+    } catch (error) {
+      console.error('Error fetching pharmacies:', error);
+      return [];
+    }
+  }
 }
 
 export const osmService = new OpenStreetMapService();

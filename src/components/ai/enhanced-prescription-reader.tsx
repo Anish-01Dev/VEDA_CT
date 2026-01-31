@@ -21,8 +21,9 @@ import {
   Brain
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import ocrService from "@/lib/ocr-service";
+import { aiClient } from '@/lib/ai-client';
 import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { aiLogger } from '@/lib/ai-logger';
 
 interface EnhancedPrescriptionReaderProps {
   className?: string;
@@ -71,21 +72,25 @@ export function EnhancedPrescriptionReader({ className }: EnhancedPrescriptionRe
   const handleImageUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Validate image
-      ocrService.validateImage(file).then((validation) => {
-        if (validation.isValid) {
-          setSelectedImage(file);
-          setError(null);
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            setImagePreview(e.target?.result as string);
-          };
-          reader.readAsDataURL(file);
-          setResult(null);
-        } else {
-          setError(validation.error);
-        }
-      });
+      // Basic image validation
+      if (file.size > 10 * 1024 * 1024) {
+        setError('Image size too large. Please use an image smaller than 10MB.');
+        return;
+      }
+      
+      if (!file.type.startsWith('image/')) {
+        setError('Please select a valid image file.');
+        return;
+      }
+      
+      setSelectedImage(file);
+      setError(null);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+      setResult(null);
     }
   }, []);
 
@@ -95,16 +100,38 @@ export function EnhancedPrescriptionReader({ className }: EnhancedPrescriptionRe
     setIsProcessing(true);
     setError(null);
     
+    aiLogger.aiStart('Prescription Reader', 'Image Analysis', selectedImage.name);
+    
     try {
-      // Preprocess image for better OCR
-      const processedImage = await ocrService.preprocessImage(selectedImage);
-      
-      // Analyze prescription
-      const analysisResult = await ocrService.analyzePrescription(processedImage, selectedLanguage);
-      setResult(analysisResult);
+      // Convert image to base64 for AI analysis
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = e.target?.result as string;
+        const imageText = base64.split(',')[1]; // Remove data:image/jpeg;base64, prefix
+        
+        // Analyze prescription using AI client
+        const analysisResult = await aiClient.analyzePrescription(imageText, selectedLanguage);
+        
+        // Format result to match expected structure
+        const formattedResult = {
+          ocr: {
+            text: 'Prescription text extracted from image',
+            confidence: analysisResult.confidence,
+            language: analysisResult.language
+          },
+          analysis: analysisResult
+        };
+        
+        setResult(formattedResult);
+        aiLogger.aiSuccess('Prescription Reader', 'Image Analysis', { 
+          medicines: analysisResult.medicines.length,
+          confidence: analysisResult.confidence 
+        });
+      };
+      reader.readAsDataURL(selectedImage);
       
     } catch (error) {
-      console.error('Prescription processing failed:', error);
+      aiLogger.aiError('Prescription Reader', 'Image Analysis', error);
       setError('Failed to process prescription. Please try again with a clearer image.');
     } finally {
       setIsProcessing(false);

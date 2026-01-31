@@ -68,7 +68,7 @@ export function PrescriptionScanner({ className }: PrescriptionScannerProps) {
     setIsScanning(true);
 
     try {
-      const API_KEY = import.meta.env.VITE_GOOGLE_AI_STUDIO_KEY;
+      const API_KEY = 'REDACTED_GOOGLE_API_KEY';
       console.log('🔑 API Key Status:', API_KEY ? 'Present' : 'Missing');
       console.log('📁 Prescription Image:', uploadedImage.name, uploadedImage.type, uploadedImage.size);
       
@@ -135,7 +135,7 @@ export function PrescriptionScanner({ className }: PrescriptionScannerProps) {
       };
       
       console.log('📤 Making API Request to Gemini...');
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
@@ -159,15 +159,119 @@ export function PrescriptionScanner({ className }: PrescriptionScannerProps) {
         throw new Error('No response from AI');
       }
 
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) || text.match(/\{[\s\S]*\}/) || text.match(/```json\s*([\s\S]*)/);
       if (!jsonMatch) {
         console.error('❌ No JSON found in response:', text);
+        // Try to extract from markdown code block even if incomplete
+        const partialMatch = text.match(/```json\s*([\s\S]*)/); 
+        if (partialMatch) {
+          console.log('🔧 Found partial JSON, attempting to complete it');
+          let partialJson = partialMatch[1];
+          
+          // Try to complete the JSON structure
+          if (!partialJson.includes('}')) {
+            partialJson += '"\n    }\n  ]\n}';
+          }
+          
+          try {
+            const completed = JSON.parse(partialJson);
+            console.log('✅ Successfully completed partial JSON');
+            const parsed = completed;
+            
+            // Validate and set medicines
+            if (parsed.medicines && Array.isArray(parsed.medicines)) {
+              setMedicines(parsed.medicines);
+              toast({ title: `💊 Found ${parsed.medicines.length} medicine(s) in prescription!` });
+              return;
+            }
+          } catch (e) {
+            console.log('❌ Could not complete partial JSON');
+          }
+        }
+        
         throw new Error('No JSON found in response');
       }
 
-      console.log('🔍 Extracted JSON:', jsonMatch[0]);
-      const parsed = JSON.parse(jsonMatch[0]);
+      console.log('🔍 Extracted JSON:', jsonMatch[1] || jsonMatch[0]);
+      
+      let parsed;
+      try {
+        // Use the captured group if available, otherwise the full match
+        const jsonString = jsonMatch[1] || jsonMatch[0];
+        
+        // Clean the JSON string before parsing
+        let cleanJson = jsonString
+          .replace(/```json/g, '')
+          .replace(/```/g, '')
+          .replace(/\n/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        
+        // Fix common JSON issues
+        cleanJson = cleanJson
+          .replace(/,\s*}/g, '}')
+          .replace(/,\s*]/g, ']')
+          .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*):/g, '$1"$2":')
+          .replace(/:\s*([^"\[\{][^,}\]]*[^,}\]\s])([,}\]])/g, ': "$1"$2');
+        
+        console.log('🧹 Cleaned JSON:', cleanJson);
+        parsed = JSON.parse(cleanJson);
+      } catch (parseError) {
+        console.error('❌ JSON Parse Error:', parseError);
+        console.error('❌ Problematic JSON:', jsonMatch[1] || jsonMatch[0]);
+        
+        // Fallback: Extract medicines manually using regex
+        const medicineMatches = text.match(/"name"\s*:\s*"([^"]+)"/g);
+        if (medicineMatches) {
+          parsed = {
+            medicines: medicineMatches.map((match, index) => {
+              const name = match.match(/"name"\s*:\s*"([^"]+)"/)?.[1] || `Medicine ${index + 1}`;
+              return {
+                name,
+                dosage: 'As prescribed',
+                frequency: 'As directed',
+                duration: 'Complete course',
+                instructions: 'Take as prescribed by doctor'
+              };
+            }),
+            doctorName: 'Not specified',
+            patientName: 'Not specified',
+            prescriptionDate: new Date().toISOString().split('T')[0],
+            language: 'detected'
+          };
+        } else {
+          throw new Error('Could not parse prescription data');
+        }
+      }
       console.log('✅ Parsed Analysis:', parsed);
+      
+      // Validate the parsed data
+      if (!parsed.medicines || !Array.isArray(parsed.medicines)) {
+        console.error('❌ Invalid medicines data:', parsed);
+        // Create fallback structure
+        parsed = {
+          medicines: [{
+            name: 'Prescription medicine detected',
+            dosage: 'As prescribed',
+            frequency: 'As directed by doctor',
+            duration: 'Complete the course',
+            instructions: 'Follow doctor\'s instructions'
+          }],
+          doctorName: parsed.doctorName || 'Not specified',
+          patientName: parsed.patientName || 'Not specified', 
+          prescriptionDate: parsed.prescriptionDate || new Date().toISOString().split('T')[0],
+          language: parsed.language || 'detected'
+        };
+      }
+      
+      // Ensure each medicine has required fields
+      parsed.medicines = parsed.medicines.map((med, index) => ({
+        name: med.name || `Medicine ${index + 1}`,
+        dosage: med.dosage || 'As prescribed',
+        frequency: med.frequency || 'As directed',
+        duration: med.duration || 'Complete course',
+        instructions: med.instructions || 'Take as prescribed by doctor'
+      }));
       
       if (!parsed.medicines || !Array.isArray(parsed.medicines)) {
         console.error('❌ Invalid medicines data:', parsed);

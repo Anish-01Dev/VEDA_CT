@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
+import { aiLogger } from '@/lib/ai-logger';
 
 interface LabResult {
   analysis: string;
@@ -47,9 +48,12 @@ export function LabAI({ className }: LabAIProps) {
     }
 
     setIsAnalyzing(true);
+    
+    const inputData = uploadedImage ? uploadedImage.name : reportText.substring(0, 100);
+    aiLogger.aiStart('Lab AI', 'Report Analysis', inputData);
 
     try {
-      const API_KEY = import.meta.env.VITE_GOOGLE_AI_STUDIO_KEY;
+      const API_KEY = 'REDACTED_GOOGLE_API_KEY';
       console.log('🔑 API Key Status:', API_KEY ? 'Present' : 'Missing');
       
       let requestBody;
@@ -114,7 +118,7 @@ export function LabAI({ className }: LabAIProps) {
       }
 
       console.log('📤 Making API Request to Gemini...');
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
@@ -149,9 +153,14 @@ export function LabAI({ className }: LabAIProps) {
       console.log('✅ Parsed Analysis:', parsed);
       
       setLabResult(parsed);
+      aiLogger.aiSuccess('Lab AI', 'Report Analysis', { 
+        findings: parsed.keyFindings?.length || 0,
+        risks: parsed.riskZones?.length || 0 
+      });
       toast({ title: '🧪 Analysis complete with Gemini AI!' });
       
     } catch (error) {
+      aiLogger.aiError('Lab AI', 'Report Analysis', error);
       console.error('❌ Lab analysis failed:', error);
       setLabResult(null);
       toast({ title: `Analysis failed: ${error.message}. Check console for details.`, variant: 'destructive' });

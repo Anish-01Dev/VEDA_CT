@@ -7,10 +7,14 @@ interface SymptomAnalysis {
 
 class GeminiAPI {
   private apiKey: string;
-  private baseUrl = 'https://generativelanguage.googleapis.com/v1/models';
+  private baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
 
   constructor() {
-    this.apiKey = import.meta.env.VITE_GOOGLE_AI_STUDIO_KEY;
+    // Use environment variable instead of hardcoded key
+    this.apiKey = import.meta.env.VITE_GOOGLE_AI_STUDIO_KEY || '';
+    if (!this.apiKey) {
+      console.warn('Gemini API key not found in environment variables');
+    }
   }
 
   async analyzeSymptoms(symptoms: string): Promise<SymptomAnalysis> {
@@ -32,7 +36,8 @@ Format response as JSON:
 }`;
 
     try {
-      const response = await fetch(`${this.baseUrl}/gemini-1.5-flash:generateContent?key=${this.apiKey}`, {
+      // User requested strictly Gemini 2.5 Flash
+      const response = await fetch(`${this.baseUrl}/gemini-2.5-flash:generateContent?key=${this.apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -42,22 +47,27 @@ Format response as JSON:
       });
 
       const result = await response.json();
+
+      if (!result.candidates || !result.candidates[0] || !result.candidates[0].content) {
+        throw new Error('Invalid Gemini API response');
+      }
+
       const text = result.candidates[0].content.parts[0].text;
-      
+
       try {
         const jsonMatch = text.match(/```json\s*({[\s\S]*?})\s*```/) || text.match(/({[\s\S]*?})/);
         if (jsonMatch) {
           return JSON.parse(jsonMatch[1]);
         }
-      } catch {}
-      
+      } catch { }
+
       // Fallback parsing
       const symptomsLower = symptoms.toLowerCase();
       let severity: 'mild' | 'moderate' | 'severe' = 'moderate';
-      
+
       if (symptomsLower.includes('chest') || symptomsLower.includes('breathing')) severity = 'severe';
       else if (symptomsLower.includes('mild')) severity = 'mild';
-      
+
       return {
         severity,
         analysis: text || 'Based on your symptoms, medical evaluation is recommended.',

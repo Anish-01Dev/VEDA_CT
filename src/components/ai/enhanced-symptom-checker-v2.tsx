@@ -23,6 +23,7 @@ import {
 import { aiClient } from '@/lib/ai-client';
 import { SymptomAnalysis } from '@/lib/ai-client';
 import { MEDICAL_CONDITIONS, SYMPTOM_CLUSTERS } from '@/lib/medical-database';
+import { aiLogger } from '@/lib/ai-logger';
 
 interface SymptomCategory {
   id: string;
@@ -123,17 +124,22 @@ export default function EnhancedSymptomCheckerV2() {
 
     setLoading(true);
     setError(null);
+    
+    const symptomText = selectedSymptoms
+      .map(s => `${s.symptom} (${s.severity}, ${s.duration})`)
+      .join(', ');
+    
+    aiLogger.aiStart('Symptom Checker', 'Analysis', symptomText);
 
     try {
-      const symptomText = selectedSymptoms
-        .map(s => `${s.symptom} (${s.severity}, ${s.duration})`)
-        .join(', ');
-
       const result = await aiClient.analyzeSymptoms(symptomText, 'en');
       setAnalysis(result);
       setActiveTab('analysis');
+      aiLogger.aiSuccess('Symptom Checker', 'Analysis', result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Analysis failed');
+      const errorMsg = err instanceof Error ? err.message : 'Analysis failed';
+      setError(errorMsg);
+      aiLogger.aiError('Symptom Checker', 'Analysis', err);
     } finally {
       setLoading(false);
     }

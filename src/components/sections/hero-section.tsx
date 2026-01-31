@@ -19,7 +19,7 @@ export function HeroSection() {
       <ErrorBoundary
         fallback={
           <div className="text-center p-8 bg-muted/10 rounded-2xl">
-            <p className="text-muted-foreground">⚠️ Content loading...</p>
+            <p className="text-muted-foreground">⚠️ {t('content.loading')}</p>
           </div>
         }
       >
@@ -34,7 +34,7 @@ export function HeroSection() {
               <div className="inline-flex items-center gap-2 mb-6 px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
                 <Zap className="w-4 h-4 text-primary" />
                 <span className="text-sm font-medium text-primary">
-                  {t('healthcare.without.barriers')}
+                  {t('ai.powered.triage')}
                 </span>
               </div>
 

@@ -26,6 +26,7 @@ import { navItems } from "@/lib/navigation-config";
 import ApiTestComponent from "@/components/debug/ApiTestComponent";
 import EnhancedSymptomCheckerV2 from "@/components/ai/enhanced-symptom-checker-v2";
 import HealthDashboard from "@/components/dashboard/health-dashboard";
+import SimpleAITest from "@/components/debug/SimpleAITest";
 
 
 gsap.registerPlugin(ScrollTrigger);
@@ -93,6 +94,12 @@ const Index = () => {
             <section className="w-full bg-[#F8F5F0] rounded-2xl p-6">
               <h2 className="text-2xl font-bold text-[#2D3748] font-nunito mb-6">{t('api.connection.test')}</h2>
               <ApiTestComponent />
+            </section>
+
+            {/* Simple AI Test */}
+            <section className="w-full bg-[#F8F5F0] rounded-2xl p-6">
+              <h2 className="text-2xl font-bold text-[#2D3748] font-nunito mb-6">🧪 AI Test</h2>
+              <SimpleAITest />
             </section>
           </main>
 

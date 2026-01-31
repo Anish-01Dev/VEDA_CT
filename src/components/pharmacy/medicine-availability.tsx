@@ -11,9 +11,11 @@ import {
   Pill,
   CheckCircle,
   XCircle,
-  RefreshCw
+  RefreshCw,
+  Navigation
 } from 'lucide-react';
 import { pharmacyDB, type Pharmacy, type Medicine, type MedicineStock } from '@/lib/pharmacy-db';
+import { osmService, type MedicalFacility } from '@/lib/osm-service';
 
 const MedicineAvailability = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -21,12 +23,57 @@ const MedicineAvailability = () => {
   const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(null);
   const [availability, setAvailability] = useState<(MedicineStock & { pharmacy: Pharmacy })[]>([]);
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
+  const [nearbyPharmacies, setNearbyPharmacies] = useState<MedicalFacility[]>([]);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
 
   useEffect(() => {
     loadPharmacies();
     loadSampleData();
+    getCurrentLocation();
   }, []);
+
+  useEffect(() => {
+    if (userLocation) {
+      findNearbyPharmacies();
+    }
+  }, [userLocation]);
+
+  const getCurrentLocation = () => {
+    setLocationLoading(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+          setLocationLoading(false);
+        },
+        (error) => {
+          console.error('Location error:', error);
+          setLocationLoading(false);
+        }
+      );
+    } else {
+      setLocationLoading(false);
+    }
+  };
+
+  const findNearbyPharmacies = async () => {
+    if (!userLocation) return;
+    
+    try {
+      const nearby = await osmService.findNearbyPharmacies(
+        userLocation.lat,
+        userLocation.lng
+      );
+      setNearbyPharmacies(nearby);
+    } catch (error) {
+      console.error('Failed to find nearby pharmacies:', error);
+    }
+  };
 
   const loadPharmacies = async () => {
     try {
@@ -287,12 +334,77 @@ const MedicineAvailability = () => {
         </Card>
       )}
 
-      {/* Nearby Pharmacies */}
+      {/* Nearby Pharmacies from Overpass API */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Navigation className="w-5 h-5" />
+            Nearby Pharmacies via GPS ({nearbyPharmacies.length})
+            {locationLoading && <RefreshCw className="w-4 h-4 animate-spin" />}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!userLocation && !locationLoading && (
+            <div className="text-center py-8">
+              <MapPin className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-gray-500 mb-4">Location access required to find nearby pharmacies</p>
+              <Button onClick={getCurrentLocation} variant="outline">
+                Enable Location
+              </Button>
+            </div>
+          )}
+          
+          {nearbyPharmacies.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {nearbyPharmacies.slice(0, 6).map((pharmacy) => (
+                <div key={pharmacy.id} className="border rounded-lg p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold">{pharmacy.name}</h3>
+                    <Badge variant="outline">
+                      {pharmacy.distance < 1 
+                        ? `${Math.round(pharmacy.distance * 1000)}m`
+                        : `${pharmacy.distance.toFixed(1)}km`
+                      }
+                    </Badge>
+                  </div>
+                  
+                  <div className="space-y-1 text-sm text-gray-600">
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-4 h-4" />
+                      {pharmacy.address}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 mt-3">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${pharmacy.lat},${pharmacy.lon}`, '_blank')}
+                    >
+                      Directions
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => window.open(`tel:${pharmacy.name}`, '_blank')}
+                    >
+                      Call
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Local Database Pharmacies */}
+      {/* Local Database Pharmacies */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MapPin className="w-5 h-5" />
-            Nearby Pharmacies ({pharmacies.length})
+            Local Pharmacies Database ({pharmacies.length})
           </CardTitle>
         </CardHeader>
         <CardContent>

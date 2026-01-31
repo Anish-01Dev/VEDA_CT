@@ -1,7 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://lnedyebiuahdqlvidybq.supabase.co';
-const supabaseAnonKey = 'REDACTED_SUPABASE_ANON_KEY';
+// Use environment variables for security
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://lnedyebiuahdqlvidybq.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'REDACTED_SUPABASE_ANON_KEY';
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Supabase configuration missing in environment variables');
+}
 
 // Create a single supabase client for interacting with your database
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {

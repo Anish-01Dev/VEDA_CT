@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/language-context";
 import { GlobalGuideProvider } from "@/contexts/guide-context";
 import { AuthProvider } from "@/contexts/auth-context";
+import AITerminalLogger from "@/components/debug/AITerminalLogger";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import HealthPage from "./pages/HealthPage";
@@ -31,6 +32,7 @@ import MaternalHealthAdvisorPage from "./pages/tools/MaternalHealthAdvisorPage";
 import MisinformationBusterPage from "./pages/tools/MisinformationBusterPage";
 import PrescriptionScannerPage from "./pages/tools/PrescriptionScannerPage";
 import VirtualDoctorPage from "./pages/VirtualDoctorPage";
+import SimpleAITest from "./components/debug/SimpleAITest";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +43,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
+          <AITerminalLogger />
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <GlobalGuideProvider>
             <Routes>
@@ -67,6 +70,7 @@ const App = () => (
               <Route path="/health-records" element={<HealthRecordsPage />} />
               <Route path="/pharmacy" element={<PharmacyPage />} />
               <Route path="/sos" element={<SOSPage />} />
+              <Route path="/ai-test" element={<SimpleAITest />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

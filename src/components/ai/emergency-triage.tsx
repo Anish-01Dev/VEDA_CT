@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
-import { geminiAPI, type SymptomAnalysis } from '@/lib/gemini-api';
+import { aiClient } from '@/lib/ai-client';
+import { aiLogger } from '@/lib/ai-logger';
 
 interface TriageResult {
-  severity: 'mild' | 'moderate' | 'severe';
+  severity: 'mild' | 'moderate' | 'severe' | 'critical' | 'emergency';
   icon: string;
   color: string;
   action: string;
@@ -67,6 +68,32 @@ export function EmergencyTriage({ className }: EmergencyTriageProps) {
         'Do not drive yourself',
         'Have someone stay with you'
       ]
+    },
+    critical: {
+      severity: 'critical' as const,
+      icon: '🚨',
+      color: 'red-600',
+      action: 'EMERGENCY - Call 108',
+      timeframe: 'IMMEDIATE',
+      recommendations: [
+        'Call 108 immediately',
+        'Go to emergency room NOW',
+        'Do not delay medical attention',
+        'Life-threatening condition'
+      ]
+    },
+    emergency: {
+      severity: 'emergency' as const,
+      icon: '🚨',
+      color: 'red-600',
+      action: 'EMERGENCY - Call 108',
+      timeframe: 'IMMEDIATE',
+      recommendations: [
+        'Call 108 immediately',
+        'Go to emergency room NOW',
+        'Do not delay medical attention',
+        'Life-threatening condition'
+      ]
     }
   };
 
@@ -81,25 +108,40 @@ export function EmergencyTriage({ className }: EmergencyTriageProps) {
     }
 
     setIsAnalyzing(true);
+    aiLogger.aiStart('Emergency Triage', 'Symptom Classification', symptoms);
 
     try {
-      const analysis = await geminiAPI.analyzeSymptoms(symptoms);
-      const baseResult = severityLevels[analysis.severity];
+      const analysis = await aiClient.analyzeSymptoms(symptoms, 'en');
+      
+      // Handle invalid severity values with fallback
+      let severity = analysis.severity;
+      if (!severityLevels[severity as keyof typeof severityLevels]) {
+        severity = 'moderate'; // Default fallback
+        console.warn(`Invalid severity '${analysis.severity}' received, using fallback: moderate`);
+      }
+      
+      const baseResult = severityLevels[severity as keyof typeof severityLevels];
       
       setTriageResult({
         ...baseResult,
-        analysis: analysis.analysis,
-        recommendations: analysis.recommendations,
-        possibleConditions: analysis.possibleConditions
+        analysis: analysis.description,
+        recommendations: analysis.suggestions,
+        possibleConditions: [analysis.condition]
       });
       
-      setAiResponse(analysis.analysis);
+      setAiResponse(analysis.description);
+      
+      aiLogger.aiSuccess('Emergency Triage', 'Symptom Classification', { 
+        severity: analysis.severity,
+        condition: analysis.condition 
+      });
       
       toast({
         title: 'AI Analysis Complete',
         description: `Severity: ${analysis.severity.toUpperCase()}`,
       });
     } catch (error) {
+      aiLogger.aiError('Emergency Triage', 'Symptom Classification', error);
       console.error('Triage error:', error);
       toast({
         title: 'Analysis Error',
@@ -169,6 +211,16 @@ export function EmergencyTriage({ className }: EmergencyTriageProps) {
                 Reset
               </Button>
             )}
+            
+            {(triageResult?.severity === 'critical' || triageResult?.severity === 'emergency') && (
+              <Button
+                onClick={callEmergency}
+                className="bg-red-600 hover:bg-red-700 text-white animate-pulse"
+              >
+                <Phone className="w-4 h-4 mr-2" />
+                Call 108 NOW
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -234,10 +286,10 @@ export function EmergencyTriage({ className }: EmergencyTriageProps) {
                       </div>
                     </div>
                     
-                    {triageResult.severity === 'severe' && (
+                    {(triageResult.severity === 'severe' || triageResult.severity === 'critical' || triageResult.severity === 'emergency') && (
                       <Button
                         onClick={callEmergency}
-                        className="bg-red-500 hover:bg-red-600 text-white"
+                        className="bg-red-500 hover:bg-red-600 text-white animate-pulse"
                       >
                         <Phone className="w-4 h-4 mr-2" />
                         Call Emergency Services

@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
-import { geminiAPI } from '@/lib/gemini-api';
+import { aiClient } from '@/lib/ai-client';
+import { aiLogger } from '@/lib/ai-logger';
 
 interface MoodEntry {
   date: string;
@@ -99,7 +100,7 @@ Return JSON format:
   "suggestions": ["specific CBT technique", "mindfulness exercise", "therapeutic activity"]
 }`;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${import.meta.env.VITE_GOOGLE_AI_STUDIO_KEY}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=REDACTED_GOOGLE_API_KEY`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -159,6 +160,7 @@ Return JSON format:
 
       toast({ title: '🧠 Mood analyzed successfully!' });
     } catch (error) {
+      aiLogger.aiError('NeuroMate', 'Mood Analysis', error);
       console.error('Mood analysis error:', error);
       toast({ title: 'Analysis failed', description: 'Please try again', variant: 'destructive' });
     } finally {

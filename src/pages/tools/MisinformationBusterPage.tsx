@@ -22,6 +22,7 @@ import { BottomNav } from "@/components/navigation/bottom-nav";
 import { navItems } from "@/lib/navigation-config";
 import aiClient, { MisinformationAnalysis } from "@/lib/ai-client";
 import dbManager from "@/lib/database-schema";
+import { aiLogger } from "@/lib/ai-logger";
 
 const TRUSTED_SOURCES = [
   { name: "WHO", url: "https://www.who.int/", description: "World Health Organization" },
@@ -67,10 +68,17 @@ const MisinformationBusterPage = () => {
     setIsAnalyzing(true);
     setError(null);
     setResult(null);
+    
+    aiLogger.aiStart('Misinformation Buster', 'Fact Check', claim);
 
     try {
       const analysis = await aiClient.analyzeMisinformation(claim, selectedLanguage);
       setResult(analysis);
+      
+      aiLogger.aiSuccess('Misinformation Buster', 'Fact Check', { 
+        verdict: analysis.verdict,
+        confidence: analysis.confidence 
+      });
 
       // Save to database
       await dbManager.addAISession({
@@ -87,6 +95,7 @@ const MisinformationBusterPage = () => {
       await loadHistory();
       setClaim("");
     } catch (error) {
+      aiLogger.aiError('Misinformation Buster', 'Fact Check', error);
       console.error('Analysis failed:', error);
       setError(error instanceof Error ? error.message : 'Analysis failed');
     } finally {

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { navItems } from "@/lib/navigation-config";
 import { BottomNav } from "@/components/navigation/bottom-nav";
+import { aiClient } from "@/lib/ai-client";
+import { toast } from "@/components/ui/use-toast";
+import { aiLogger } from "@/lib/ai-logger";
 
 const SUGGESTIONS = [
   ["No caffeine after 6 PM", "Try gratitude journaling", "10-minute evening walk"],
@@ -9,8 +12,23 @@ const SUGGESTIONS = [
   ["Limit screen time after 9 PM", "Stretch for 5 minutes", "Call a friend or family member"],
 ];
 
-const getRandomChallenges = () => {
-  return SUGGESTIONS[Math.floor(Math.random() * SUGGESTIONS.length)];
+const getAIPersonalizedChallenges = async (mood: string, symptoms: string) => {
+  aiLogger.aiStart('Health Habit Coach', 'Challenge Generation', `${mood} | ${symptoms}`);
+  
+  try {
+    const prompt = `Based on mood: "${mood}" and symptoms: "${symptoms}", provide 3 personalized health habit challenges for the next 3 days. Focus on simple, actionable habits that address the specific mood and symptoms mentioned.`;
+    const response = await aiClient.getHealthAdvice(prompt, 'en');
+    
+    // Extract 3 challenges from AI response
+    const challenges = response.advice.split(/[.!]/).filter(s => s.trim().length > 10).slice(0, 3);
+    const result = challenges.length >= 3 ? challenges : SUGGESTIONS[Math.floor(Math.random() * SUGGESTIONS.length)];
+    
+    aiLogger.aiSuccess('Health Habit Coach', 'Challenge Generation', { challenges: result.length });
+    return result;
+  } catch (error) {
+    aiLogger.aiError('Health Habit Coach', 'Challenge Generation', error);
+    return SUGGESTIONS[Math.floor(Math.random() * SUGGESTIONS.length)];
+  }
 };
 
 // LocalStorage helpers
@@ -53,17 +71,28 @@ const HealthHabitCoachPage = () => {
     setCurrentChallenge(challenges[0] || null);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!mood && !symptoms) return;
-    const challenges = getRandomChallenges();
-    const date = new Date().toISOString().slice(0, 10);
-    addChallenge(date, mood, symptoms, challenges);
-    const updated = getChallenges();
-    setHistory(updated);
-    setCurrentChallenge(updated[0]);
-    setMood("");
-    setSymptoms("");
+    
+    setIsGenerating(true);
+    try {
+      const challenges = await getAIPersonalizedChallenges(mood, symptoms);
+      const date = new Date().toISOString().slice(0, 10);
+      addChallenge(date, mood, symptoms, challenges);
+      const updated = getChallenges();
+      setHistory(updated);
+      setCurrentChallenge(updated[0]);
+      setMood("");
+      setSymptoms("");
+      toast({ title: '🎯 AI-powered challenges generated!', description: 'Personalized for your current state' });
+    } catch (error) {
+      toast({ title: 'Challenge generation failed', description: 'Please try again', variant: 'destructive' });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleProgress = (id: number, progress: number) => {
@@ -78,8 +107,8 @@ const HealthHabitCoachPage = () => {
   return (
     <div className="min-h-screen bg-[#FEFCF3] flex flex-col items-center justify-center p-4">
       <div className="max-w-lg w-full bg-white rounded-2xl shadow-lg p-8 space-y-6">
-        <h1 className="text-2xl font-bold text-[#2D3748] font-nunito mb-2 text-center">Health Habit Coach</h1>
-        <p className="text-center text-[#4A5568] mb-4">Get 3-day personalized health challenges based on your mood and symptoms.</p>
+        <h1 className="text-2xl font-bold text-[#2D3748] font-nunito mb-2 text-center">🤖 AI Health Habit Coach</h1>
+        <p className="text-center text-[#4A5568] mb-4">Get AI-powered personalized health challenges based on your mood and symptoms.</p>
         {/* Mood/Symptom Input Form */}
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
@@ -90,7 +119,20 @@ const HealthHabitCoachPage = () => {
             <label className="block text-sm font-semibold mb-1">Any symptoms?</label>
             <input type="text" className="w-full border rounded-lg px-3 py-2" placeholder="e.g. Headache, Cramps..." value={symptoms} onChange={e => setSymptoms(e.target.value)} />
           </div>
-          <button type="submit" className="w-full bg-[#A3E635] text-white font-bold py-2 rounded-lg hover:bg-[#84cc16] transition">Get Challenges</button>
+          <button 
+            type="submit" 
+            disabled={(!mood && !symptoms) || isGenerating}
+            className="w-full bg-[#A3E635] text-white font-bold py-2 rounded-lg hover:bg-[#84cc16] transition disabled:opacity-50"
+          >
+            {isGenerating ? (
+              <div className="flex items-center justify-center gap-2">
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Generating AI Challenges...
+              </div>
+            ) : (
+              'Get AI-Powered Challenges'
+            )}
+          </button>
         </form>
         {/* Challenge Suggestions */}
         {currentChallenge && (

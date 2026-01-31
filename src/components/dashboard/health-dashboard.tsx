@@ -24,6 +24,7 @@ import {
   Activity as ActivityIcon
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { useLanguage } from '@/contexts/language-context';
 
 interface VitalSigns {
   bloodPressure: { systolic: number; diastolic: number };
@@ -54,6 +55,7 @@ interface HealthMetric {
 }
 
 export default function HealthDashboard() {
+  const { t } = useLanguage();
   const [vitals, setVitals] = useState<VitalSigns[]>([]);
   const [medications, setMedications] = useState<Medication[]>([]);
   const [healthMetrics, setHealthMetrics] = useState<HealthMetric[]>([]);
@@ -79,10 +81,10 @@ export default function HealthDashboard() {
 
     // Sample health metrics
     const sampleMetrics: HealthMetric[] = [
-      { name: 'Blood Pressure', value: 120, unit: 'mmHg', normalRange: { min: 90, max: 140 }, trend: 'stable', status: 'normal' },
-      { name: 'Heart Rate', value: 72, unit: 'bpm', normalRange: { min: 60, max: 100 }, trend: 'down', status: 'normal' },
-      { name: 'Temperature', value: 98.6, unit: '°F', normalRange: { min: 97, max: 99 }, trend: 'stable', status: 'normal' },
-      { name: 'Oxygen Saturation', value: 98, unit: '%', normalRange: { min: 95, max: 100 }, trend: 'up', status: 'normal' },
+      { name: t('blood.pressure'), value: 120, unit: 'mmHg', normalRange: { min: 90, max: 140 }, trend: 'stable', status: 'normal' },
+      { name: t('heart.rate'), value: 72, unit: 'bpm', normalRange: { min: 60, max: 100 }, trend: 'down', status: 'normal' },
+      { name: t('temperature'), value: 98.6, unit: '°F', normalRange: { min: 97, max: 99 }, trend: 'stable', status: 'normal' },
+      { name: t('oxygen.saturation'), value: 98, unit: '%', normalRange: { min: 95, max: 100 }, trend: 'up', status: 'normal' },
     ];
     setHealthMetrics(sampleMetrics);
   }, []);
@@ -93,6 +95,15 @@ export default function HealthDashboard() {
       case 'warning': return 'bg-yellow-100 text-yellow-800';
       case 'critical': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'normal': return t('normal');
+      case 'warning': return t('warning');
+      case 'critical': return t('critical');
+      default: return status;
     }
   };
 
@@ -127,19 +138,19 @@ export default function HealthDashboard() {
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Health Dashboard</h1>
+        <h1 className="text-3xl font-bold">{t('health.dashboard')}</h1>
         <Badge className="bg-green-100 text-green-800">
           <CheckCircle className="w-4 h-4 mr-1" />
-          All Systems Normal
+          {t('all.systems.normal')}
         </Badge>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="vitals">Vital Signs</TabsTrigger>
-          <TabsTrigger value="medications">Medications</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="overview">{t('overview')}</TabsTrigger>
+          <TabsTrigger value="vitals">{t('vitals')}</TabsTrigger>
+          <TabsTrigger value="medications">{t('medications')}</TabsTrigger>
+          <TabsTrigger value="analytics">{t('analytics')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -154,10 +165,10 @@ export default function HealthDashboard() {
                 <CardContent>
                   <div className="text-2xl font-bold">{metric.value} {metric.unit}</div>
                   <p className="text-xs text-muted-foreground">
-                    Normal: {metric.normalRange.min}-{metric.normalRange.max} {metric.unit}
+                    {t('normal')}: {metric.normalRange.min}-{metric.normalRange.max} {metric.unit}
                   </p>
                   <Badge className={`mt-2 ${getStatusColor(metric.status)}`}>
-                    {metric.status}
+                    {getStatusText(metric.status)}
                   </Badge>
                 </CardContent>
               </Card>
@@ -170,7 +181,7 @@ export default function HealthDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Activity className="w-5 h-5" />
-                  Vital Signs Trend
+                  {t('vital.signs.trend')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -192,12 +203,12 @@ export default function HealthDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Pill className="w-5 h-5" />
-                  Medication Compliance
+                  {t('medication.compliance')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span>Today's Progress</span>
+                  <span>{t('todays.progress')}</span>
                   <span className="text-2xl font-bold">{getMedicationStatus().taken}/{getMedicationStatus().total}</span>
                 </div>
                 <Progress value={getMedicationStatus().percentage} className="w-full" />
@@ -214,7 +225,7 @@ export default function HealthDashboard() {
                           <CheckCircle className="w-5 h-5 text-green-600" />
                         ) : (
                           <Button size="sm" onClick={() => markMedicationTaken(med.id)}>
-                            Mark Taken
+                            {t('mark.taken')}
                           </Button>
                         )}
                       </div>
@@ -230,7 +241,7 @@ export default function HealthDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Blood Pressure History</CardTitle>
+                <CardTitle>{t('blood.pressure.history')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -248,7 +259,7 @@ export default function HealthDashboard() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Latest Vital Signs</CardTitle>
+                <CardTitle>{t('latest.vital.signs')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {vitals.length > 0 && (
@@ -256,7 +267,7 @@ export default function HealthDashboard() {
                     <div className="flex items-center justify-between p-3 border rounded">
                       <div className="flex items-center gap-2">
                         <Heart className="w-5 h-5 text-red-500" />
-                        <span>Blood Pressure</span>
+                        <span>{t('blood.pressure')}</span>
                       </div>
                       <span className="font-bold">
                         {vitals[vitals.length - 1].bloodPressure.systolic}/{vitals[vitals.length - 1].bloodPressure.diastolic} mmHg
@@ -265,21 +276,21 @@ export default function HealthDashboard() {
                     <div className="flex items-center justify-between p-3 border rounded">
                       <div className="flex items-center gap-2">
                         <Activity className="w-5 h-5 text-blue-500" />
-                        <span>Heart Rate</span>
+                        <span>{t('heart.rate')}</span>
                       </div>
                       <span className="font-bold">{vitals[vitals.length - 1].heartRate} bpm</span>
                     </div>
                     <div className="flex items-center justify-between p-3 border rounded">
                       <div className="flex items-center gap-2">
                         <Thermometer className="w-5 h-5 text-orange-500" />
-                        <span>Temperature</span>
+                        <span>{t('temperature')}</span>
                       </div>
                       <span className="font-bold">{vitals[vitals.length - 1].temperature}°F</span>
                     </div>
                     <div className="flex items-center justify-between p-3 border rounded">
                       <div className="flex items-center gap-2">
                         <Droplets className="w-5 h-5 text-cyan-500" />
-                        <span>Oxygen Saturation</span>
+                        <span>{t('oxygen.saturation')}</span>
                       </div>
                       <span className="font-bold">{vitals[vitals.length - 1].oxygenSaturation}%</span>
                     </div>
@@ -295,7 +306,7 @@ export default function HealthDashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Pill className="w-5 h-5" />
-                Medication Schedule
+                {t('medication.schedule')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -320,11 +331,11 @@ export default function HealthDashboard() {
                       {med.taken ? (
                         <Badge className="bg-green-100 text-green-800">
                           <CheckCircle className="w-4 h-4 mr-1" />
-                          Taken
+                          {t('taken')}
                         </Badge>
                       ) : (
                         <Button onClick={() => markMedicationTaken(med.id)}>
-                          Mark as Taken
+                          {t('mark.as.taken')}
                         </Button>
                       )}
                     </div>
@@ -339,7 +350,7 @@ export default function HealthDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Health Trends</CardTitle>
+                <CardTitle>{t('health.trends')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -356,7 +367,7 @@ export default function HealthDashboard() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Health Insights</CardTitle>
+                <CardTitle>{t('health.insights')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Alert>

@@ -1,13 +1,15 @@
 import { z } from 'zod';
-import { 
-  MEDICAL_CONDITIONS, 
-  SYMPTOM_CLUSTERS, 
-  MEDICATIONS, 
-  findConditionsBySymptoms, 
-  getEmergencyAdvice, 
-  getTreatmentPlan 
+import {
+  MEDICAL_CONDITIONS,
+  SYMPTOM_CLUSTERS,
+  MEDICATIONS,
+  findConditionsBySymptoms,
+  getEmergencyAdvice,
+  getTreatmentPlan
 } from './medical-database';
 import LanguageDetector, { type SupportedLanguage } from './language-detection';
+import { sambaNovaAPI } from './sambanova-api';
+import { aiLogger } from './ai-logger';
 
 // AI Response Schemas
 const SymptomAnalysisSchema = z.object({
@@ -74,12 +76,14 @@ class AIClient {
   private apiKey: string;
   private baseUrl: string;
   private isOnline: boolean = true;
-  private model: string = 'gemini-1.5-pro';
+  private model: string = 'gemini-2.5-flash';
   private lastErrorStatus: number = 0;
+  private useSambaNova: boolean = true;
 
   constructor() {
-    this.apiKey = import.meta.env.VITE_GOOGLE_AI_STUDIO_KEY || '';
-    this.baseUrl = 'https://generativelanguage.googleapis.com/v1/models';
+    this.apiKey = 'REDACTED_GOOGLE_API_KEY';
+    this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
+    this.useSambaNova = true; // Enabled as primary/fallback
     this.checkConnectivity();
   }
 
@@ -97,87 +101,93 @@ class AIClient {
     if (!this.isOnline) {
       throw new Error('Offline mode - no internet connection');
     }
-    
+
     const apiKeyValidation = this.validateAPIKey();
     if (!apiKeyValidation.isValid) {
       throw new Error(apiKeyValidation.error || 'Invalid API key');
     }
 
-      // Try different models in order of preference (correct names for v1 API)
-  const models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
-    
+    // Use available models with correct API version
+    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-001'];
+
     for (const model of models) {
       try {
-        const response = await fetch(`${this.baseUrl}/${model}:generateContent?key=${this.apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `${systemPrompt}\n\nUser: ${prompt}\n\nAssistant: Please respond with valid JSON only.`
-            }]
-          }],
-          generationConfig: {
-            temperature: 0.3,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 2048,
-          },
-          safetySettings: [
-            {
-              category: "HARM_CATEGORY_HARASSMENT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-              category: "HARM_CATEGORY_HATE_SPEECH",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            }
-          ]
-        })
-      });
+        // Use v1beta API for all models
+        const apiVersion = 'v1beta';
+        const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${model}:generateContent?key=${this.apiKey}`;
 
-              if (!response.ok) {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: `${systemPrompt}\n\nUser: ${prompt}\n\nAssistant: Please respond with valid JSON only.`
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.3,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 2048,
+            },
+            safetySettings: [
+              {
+                category: "HARM_CATEGORY_HARASSMENT",
+                threshold: "BLOCK_MEDIUM_AND_ABOVE"
+              },
+              {
+                category: "HARM_CATEGORY_HATE_SPEECH",
+                threshold: "BLOCK_MEDIUM_AND_ABOVE"
+              },
+              {
+                category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                threshold: "BLOCK_MEDIUM_AND_ABOVE"
+              },
+              {
+                category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+                threshold: "BLOCK_MEDIUM_AND_ABOVE"
+              }
+            ]
+          })
+        });
+
+        if (!response.ok) {
           const errorText = await response.text();
           console.error(`API Error Response for ${model}:`, errorText);
-          
+
           // Track the error status
           this.lastErrorStatus = response.status;
-          
+
           // Check if it's a quota error (429)
           if (response.status === 429) {
             console.warn(`Quota exceeded for ${model}. Trying next model...`);
+            // Add exponential backoff for quota errors
+            await new Promise(resolve => setTimeout(resolve, 1000 * (models.indexOf(model) + 1)));
             continue;
           }
-          
+
           // Check if it's a 404 (model not found)
           if (response.status === 404) {
             console.warn(`Model ${model} not found. Trying next model...`);
             continue;
           }
-          
+
           // For other errors, continue to next model
           continue;
         }
 
         const data = await response.json();
-        
+
         if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
           console.error(`Invalid API response format for ${model}`);
           continue;
         }
 
         const text = data.candidates[0].content.parts[0].text;
-        
+
         // Extract JSON from response
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
@@ -193,133 +203,140 @@ class AIClient {
         continue;
       }
     }
-    
+
     // If we get here, all models failed
     const errorMessage = 'All available models failed. ';
-    
+
     // Check if it was due to quota issues
     if (this.lastErrorStatus === 429) {
       throw new Error(errorMessage + 'You have exceeded your API quota. Please check your Google AI Studio dashboard or wait for quota reset.');
     }
-    
+
     throw new Error(errorMessage + 'Please check your API key and try again.');
   }
 
   // Public API Methods
   async analyzeSymptoms(symptoms: string, language?: string): Promise<SymptomAnalysis> {
+    const startTime = Date.now();
+    aiLogger.aiStart('AI Client', 'Symptom Analysis', symptoms);
+
     // Auto-detect language if not provided
-    const detectedLanguage = language || LanguageDetector.detectLanguage(symptoms).language;
+    const detectedLanguage = (language || LanguageDetector.detectLanguage(symptoms).language) as SupportedLanguage;
+
+    // Try SambaNova first if configured
+    if (this.useSambaNova) {
+      try {
+        aiLogger.aiStart('SambaNova', 'Symptom Analysis', symptoms);
+        const sambaResponse = await sambaNovaAPI.analyzeSymptoms(symptoms, detectedLanguage);
+        const result = SymptomAnalysisSchema.parse(sambaResponse);
+        aiLogger.aiSuccess('SambaNova', 'Symptom Analysis', result);
+        aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
+        return result;
+      } catch (error) {
+        aiLogger.aiError('SambaNova', 'Symptom Analysis', error);
+        aiLogger.aiFallback('AI Client', 'SambaNova', 'Gemini');
+      }
+    }
+
     try {
       // First, use our medical database for initial analysis
       const symptomList = symptoms.toLowerCase().split(/[,\s]+/).filter(s => s.length > 2);
       const matchedConditions = findConditionsBySymptoms(symptomList);
-      
+
       // Check for emergency symptom clusters
-      const emergencyCluster = SYMPTOM_CLUSTERS.find(cluster => 
-        cluster.urgency === 'immediate' && 
+      const emergencyCluster = SYMPTOM_CLUSTERS.find(cluster =>
+        cluster.urgency === 'immediate' &&
         cluster.symptoms.some(s => symptomList.includes(s))
       );
-      
+
       let primaryCondition = matchedConditions[0];
       let isEmergency = false;
-      
+
       if (emergencyCluster) {
         isEmergency = true;
         // Find the emergency condition from our database
-        const emergencyCondition = MEDICAL_CONDITIONS.find(c => 
-          emergencyCluster.conditions.includes(c.id) || 
+        const emergencyCondition = MEDICAL_CONDITIONS.find(c =>
+          emergencyCluster.conditions.includes(c.id) ||
           emergencyCluster.conditions.includes(c.name.toLowerCase().replace(/\s+/g, '_'))
         );
         if (emergencyCondition) {
           primaryCondition = emergencyCondition;
         }
       }
-      
+
       // Enhanced system prompt with medical database context and language preservation
       const languageInstructions = LanguageDetector.getLanguageInstructions(detectedLanguage);
-      const systemPrompt = `You are an AI healthcare assistant with access to a comprehensive medical database. Analyze the following symptoms and provide a detailed response in JSON format.
+      const systemPrompt = `You are an elite expert doctor. Be extremely concise and direct.
+      
+CRITICAL RULES:
+1. NO fluff, NO greetings, NO "Based on...". Start directly with the medical fact.
+2. ANSWERS: Max 2-3 sentences. Use bullet points for steps.
+3. QUESTIONS: Ask ONLY ONE follow-up question at a time. Max 10 words per question.
+4. TONE: Professional, sharp, authoritative, yet empathetic.
 
 MEDICAL DATABASE CONTEXT:
 - Detected possible conditions: ${matchedConditions.map(c => c.name).join(', ')}
-- Emergency assessment: ${isEmergency ? 'POTENTIAL EMERGENCY DETECTED' : 'No immediate emergency'}
+- Emergency assessment: ${isEmergency ? 'POTENTIAL EMERGENCY' : 'No immediate emergency'}
 - Primary condition: ${primaryCondition?.name || 'Unknown'}
-- Input language detected: ${LanguageDetector.getLanguageName(detectedLanguage)}
 
-CRITICAL LANGUAGE REQUIREMENT:
-${languageInstructions}
+RESPOND LIKE THIS:
+- "Likely a tension headache. Rest in a dark room."
+- "taking any medication?"
+- "High fever typically indicates infection. Monitor temperature closely."
 
-Requirements:
-1. Most likely condition (medical term) - use the detected condition if appropriate
-2. Confidence level (0-100) - consider symptom match quality
-3. Severity (mild/moderate/severe/emergency) - prioritize safety
-4. Description MUST be in the same language as the input: ${LanguageDetector.getLanguageName(detectedLanguage)}
-5. 4 specific actionable suggestions based on medical best practices in the same language
-6. Medical reasoning for the diagnosis in the same language
-7. Emergency contact instructions if needed in the same language
-8. Follow-up instructions in the same language
 
-EMERGENCY RED FLAGS TO CHECK:
-- Chest pain with shortness of breath
-- Sudden severe headache
-- One-sided weakness or numbness
-- Difficulty speaking or confusion
-- Severe abdominal pain
-- High fever with confusion
-
-IMPORTANT: 
-- ALWAYS respond in the same language as the input text
-- Never translate or change the language of your response
-- Always err on the side of caution
-- For severe symptoms, recommend immediate medical attention
-- Provide evidence-based medical advice
-- Consider Indian healthcare context
-- Respond in valid JSON format only
-- If emergency symptoms detected, prioritize immediate medical care
-
-Example response format in ${LanguageDetector.getLanguageName(detectedLanguage)}:
+Example doctor response in ${LanguageDetector.getLanguageName(detectedLanguage)}:
 {
-  "condition": "${primaryCondition?.name || 'Medical Evaluation Required'}",
+  "condition": "${primaryCondition?.name || 'Upper respiratory infection'}",
   "confidence": 85,
   "severity": "${primaryCondition?.severity || 'moderate'}",
-  "description": "Based on your symptoms, you likely have ${primaryCondition?.name || 'a medical condition requiring evaluation'}.",
+  "description": "Based on your symptoms, this looks like a common upper respiratory infection. These usually start with the symptoms you're describing and are quite treatable.",
   "suggestions": [
-    "Rest and stay hydrated with plenty of fluids",
-    "Take paracetamol for fever as directed",
-    "Use saline nasal drops for congestion",
-    "Monitor symptoms and seek medical care if they worsen"
+    "Start with plenty of rest and fluids - aim for 8-10 glasses of water daily",
+    "Take paracetamol 500mg every 6 hours for fever and aches",
+    "Use saline nasal drops or spray for congestion relief",
+    "Come see me if you're not feeling better in 5-7 days"
   ],
-  "reasoning": "Your symptoms are consistent with ${primaryCondition?.name || 'common medical conditions'}. ${primaryCondition?.symptoms.join(', ')} are typical presentations.",
-  "emergency_contact": "${isEmergency ? '🚨 EMERGENCY: Seek immediate medical attention. Call 108 immediately.' : 'Seek medical attention if symptoms worsen or persist.'}",
-  "follow_up": "If symptoms persist beyond 7 days or worsen, consult a healthcare provider."
+  "reasoning": "Your combination of symptoms is typical for what we see with viral infections this time of year. The good news is these usually resolve on their own with proper care.",
+  "emergency_contact": "${isEmergency ? 'This needs immediate attention - please go to the emergency room or call 108 right away' : 'See a doctor if symptoms worsen or you develop breathing difficulties'}",
+  "follow_up": "I'd like to see you back in a week if you're not improving, or sooner if you develop any concerning symptoms like difficulty breathing or high fever."
 }`;
 
       const response = await this.makeAPIRequest(symptoms, systemPrompt, detectedLanguage);
-      
+
       // Handle case where AI returns array instead of string for description
       if (response.description && Array.isArray(response.description)) {
         response.description = response.description.join('. ');
       }
-      
+
       // Enhance response with medical database information
       if (primaryCondition) {
         response.condition = primaryCondition.name;
         response.severity = primaryCondition.severity;
         response.emergency_contact = getEmergencyAdvice(primaryCondition);
-        
+
         // Add treatment plan if available
         if (response.follow_up) {
           response.follow_up += '\n\n' + getTreatmentPlan(primaryCondition);
         }
       }
-      
-      return SymptomAnalysisSchema.parse(response);
+
+      const result = SymptomAnalysisSchema.parse(response);
+      aiLogger.aiSuccess('AI Client', 'Symptom Analysis', result);
+      aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
+      return result;
     } catch (error) {
-      console.warn('API failed, using offline fallback:', error);
-      return SymptomAnalysisSchema.parse(this.getOfflineResponse('symptom_analysis', symptoms, language));
+      aiLogger.aiError('AI Client', 'Symptom Analysis', error);
+      aiLogger.aiOffline('AI Client', 'Symptom Analysis');
+      const fallbackResult = SymptomAnalysisSchema.parse(this.getOfflineResponse('symptom_analysis', symptoms, language));
+      aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
+      return fallbackResult;
     }
   }
 
   async analyzePrescription(prescriptionText: string, language: string = 'en'): Promise<PrescriptionAnalysis> {
+    const startTime = Date.now();
+    aiLogger.aiStart('AI Client', 'Prescription Analysis', prescriptionText);
     const systemPrompt = `You are an AI prescription reader and medical interpreter. Analyze this prescription and provide detailed information in JSON format.
 
 Requirements:
@@ -356,58 +373,105 @@ Example response format:
 }`;
 
     const response = await this.makeAPIRequest(prescriptionText, systemPrompt, language);
-    return PrescriptionAnalysisSchema.parse(response);
+    const result = PrescriptionAnalysisSchema.parse(response);
+    aiLogger.aiSuccess('AI Client', 'Prescription Analysis', result);
+    aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
+    return result;
   }
 
   async getHealthAdvice(query: string, language: string = 'en'): Promise<HealthAdvice> {
+    const startTime = Date.now();
+    aiLogger.aiStart('AI Client', 'Health Advice', query);
+
+    // Try SambaNova first if configured
+    if (this.useSambaNova) {
+      try {
+        aiLogger.aiStart('SambaNova', 'Health Advice', query);
+        const sambaResponse = await sambaNovaAPI.getHealthAdvice(query, language);
+        const result = HealthAdviceSchema.parse(sambaResponse);
+        aiLogger.aiSuccess('SambaNova', 'Health Advice', result);
+        aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
+        return result;
+      } catch (error) {
+        aiLogger.aiError('SambaNova', 'Health Advice', error);
+        aiLogger.aiFallback('AI Client', 'SambaNova', 'Gemini');
+      }
+    }
+
     try {
       let systemPrompt = '';
       if (language === 'hi') {
-        systemPrompt = `आप एक AI स्वास्थ्य सलाहकार हैं। संक्षिप्त और सटीक स्वास्थ्य सलाह दें। केवल हिंदी में JSON प्रारूप में उत्तर दें।
+        systemPrompt = `You are an elite expert doctor. Be extremely concise and direct in Hindi.
+      
+CRITICAL RULES:
+1. NO fluff, NO greetings. Start directly with the medical fact.
+2. Max 2-3 sentences.
+3. Tone: Professional, authoritative.
 
+Only Hindi JSON response:
 {
-  "advice": "यहाँ हिंदी में सलाह लिखें",
+  "advice": "सीधी और स्पष्ट सलाह",
   "confidence": 85,
-  "reasoning": "हिंदी में कारण",
-  "sources": ["WHO", "ICMR"],
-  "contraindications": ["हिंदी में चेतावनी"]
+  "reasoning": "चिकित्सा तथ्य",
+  "sources": ["चिकित्सा अनुभव"],
+  "contraindications": ["सावधानियां"]
 }`;
       } else if (language === 'ta') {
-        systemPrompt = `நீங்கள் ஒரு AI சுகாதார ஆலோசகர். சுருக்கமான மற்றும் துல்லியமான சுகாதார ஆலோசனை வழங்கவும். தமிழில் மட்டும் JSON வடிவத்தில் பதிலளிக்கவும்।
+        systemPrompt = `You are an elite expert doctor. Be extremely concise and direct in Tamil.
+      
+CRITICAL RULES:
+1. NO fluff, NO greetings. Start directly with the medical fact.
+2. Max 2-3 sentences.
+3. Tone: Professional, authoritative.
 
+Only Tamil JSON response:
 {
-  "advice": "தமிழில் ஆலோசனை எழுதுங்கள்",
+  "advice": "நேரடியான மருத்துவ ஆலோசனை",
   "confidence": 85,
-  "reasoning": "தமிழில் காரணம்",
-  "sources": ["WHO", "ICMR"],
-  "contraindications": ["தமிழில் எச்சரிக்கை"]
+  "reasoning": "மருத்துவ உண்மை",
+  "sources": ["மருத்துவ அனுபவம்"],
+  "contraindications": ["எச்சரிக்கைகள்"]
 }`;
       } else {
-        systemPrompt = `You are an AI health advisor. Provide brief and accurate health advice. Respond in JSON format in English only.
+        systemPrompt = `You are an elite expert doctor. Be extremely concise and direct.
+      
+CRITICAL RULES:
+1. NO fluff, NO greetings, NO "As an AI...". Start directly with the medical fact.
+2. ANSWERS: Max 2-3 sentences. Bullet points preferred.
+3. TONE: Professional, sharp, authoritative.
 
+JSON format:
 {
-  "advice": "Write advice here in English",
+  "advice": "Rest immediately. Hydrate.",
   "confidence": 85,
-  "reasoning": "Reasoning in English",
-  "sources": ["WHO", "ICMR"],
-  "contraindications": ["Warning in English"]
+  "reasoning": "Classic signs of dehydration.",
+  "sources": ["Clinical Protocols"],
+  "contraindications": ["Avoid caffeine"]
 }`;
       }
 
       const response = await this.makeAPIRequest(query, systemPrompt, language);
-      
+
       if (response.advice && Array.isArray(response.advice)) {
         response.advice = response.advice.join('. ');
       }
-      
-      return HealthAdviceSchema.parse(response);
+
+      const result = HealthAdviceSchema.parse(response);
+      aiLogger.aiSuccess('AI Client', 'Health Advice', result);
+      aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
+      return result;
     } catch (error) {
-      console.warn('API failed, using offline fallback:', error);
-      return HealthAdviceSchema.parse(this.getOfflineResponse('health_advice', query, language));
+      aiLogger.aiError('AI Client', 'Health Advice', error);
+      aiLogger.aiOffline('AI Client', 'Health Advice');
+      const fallbackResult = HealthAdviceSchema.parse(this.getOfflineResponse('health_advice', query, language));
+      aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
+      return fallbackResult;
     }
   }
 
   async analyzeMisinformation(claim: string, language: string = 'en'): Promise<MisinformationAnalysis> {
+    const startTime = Date.now();
+    aiLogger.aiStart('AI Client', 'Misinformation Analysis', claim);
     const systemPrompt = `You are an AI fact-checker specializing in medical misinformation. Analyze this claim and provide verification in JSON format.
 
 Requirements:
@@ -440,10 +504,15 @@ Example response format:
 }`;
 
     const response = await this.makeAPIRequest(claim, systemPrompt, language);
-    return MisinformationAnalysisSchema.parse(response);
+    const result = MisinformationAnalysisSchema.parse(response);
+    aiLogger.aiSuccess('AI Client', 'Misinformation Analysis', result);
+    aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
+    return result;
   }
 
   async analyzeFirstAid(imageDescription: string, language: string = 'en'): Promise<FirstAidAnalysis> {
+    const startTime = Date.now();
+    aiLogger.aiStart('AI Client', 'First Aid Analysis', imageDescription);
     const systemPrompt = `You are an AI first aid advisor. Analyze this injury description and provide first aid guidance in JSON format.
 
 Requirements:
@@ -487,15 +556,18 @@ Example response format:
 }`;
 
     const response = await this.makeAPIRequest(imageDescription, systemPrompt, language);
-    return FirstAidAnalysisSchema.parse(response);
+    const result = FirstAidAnalysisSchema.parse(response);
+    aiLogger.aiSuccess('AI Client', 'First Aid Analysis', result);
+    aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
+    return result;
   }
 
   async translateText(text: string, fromLang: string, toLang: string): Promise<string> {
     if (fromLang === toLang) return text;
-    
+
     const systemPrompt = `You are a medical translator. Translate the following text from ${fromLang} to ${toLang}. 
     Maintain medical accuracy and cultural sensitivity. Return only the translated text.`;
-    
+
     const response = await this.makeAPIRequest(text, systemPrompt);
     return response || text;
   }
@@ -512,38 +584,60 @@ Example response format:
     if (!this.apiKey) {
       return { isValid: false, error: 'API key is missing' };
     }
-    
+
     if (this.apiKey === 'your_gemini_api_key_here') {
       return { isValid: false, error: 'API key is not configured. Please add your API key to .env file' };
     }
-    
+
     if (!this.apiKey.startsWith('AIzaSy')) {
       return { isValid: false, error: 'Invalid API key format. Should start with AIzaSy' };
     }
-    
+
     if (this.apiKey.length < 35) {
       return { isValid: false, error: 'API key seems too short' };
     }
-    
+
     return { isValid: true };
   }
 
   async testConnection(): Promise<boolean> {
+    aiLogger.aiStart('AI Client', 'Connection Test');
+
+    // Test SambaNova first if configured
+    if (this.useSambaNova) {
+      try {
+        const sambaTest = await sambaNovaAPI.testConnection();
+        if (sambaTest) {
+          aiLogger.aiConnection('SambaNova', 'connected');
+          return true;
+        }
+      } catch (error) {
+        aiLogger.aiConnection('SambaNova', 'failed');
+      }
+    }
+
+    // Fallback to Gemini
     try {
       const testResponse = await this.makeAPIRequest(
         'Hello',
         'You are a helpful assistant. Respond with "OK" if you receive this message.',
         'en'
       );
+      aiLogger.aiConnection('Gemini', 'connected');
       return true;
     } catch (error) {
-      console.error('API connection test failed:', error);
+      aiLogger.aiConnection('Gemini', 'failed');
+      aiLogger.aiError('AI Client', 'Connection Test', error);
       return false;
     }
   }
 
+  getSambaNovaStatus(): boolean {
+    return this.useSambaNova && sambaNovaAPI.isConfigured();
+  }
+
   // Offline fallback responses for when quota is exceeded
-  private getOfflineResponse(type: string, query: string, language: string = 'en'): any {
+  private getOfflineResponse(type: string, query: string, language: string = 'en'): unknown {
     const detectedLanguage = LanguageDetector.detectLanguage(query).language;
     const isHindi = detectedLanguage === 'hi';
     const isTamil = detectedLanguage === 'ta';
@@ -556,36 +650,36 @@ Example response format:
     const isPunjabi = detectedLanguage === 'pa';
     const isOdia = detectedLanguage === 'or';
     const isAssamese = detectedLanguage === 'as';
-    
+
     switch (type) {
       case 'health_advice':
         return {
           advice: isHindi ? "आपकी चिंता के लिए धन्यवाद। कृपया अपने स्वास्थ्य के बारे में चिकित्सक से सलाह लें।" :
-                 isTamil ? "உங்கள் கவலைக்கு நன்றி. தயவுசெய்து உங்கள் சுகாதாரத்தைப் பற்றி மருத்துவரிடம் ஆலோசனை கேள்வி." :
-                 "Thank you for your concern. Please consult a healthcare provider for personalized medical advice.",
+            isTamil ? "உங்கள் கவலைக்கு நன்றி. தயவுசெய்து உங்கள் சுகாதாரத்தைப் பற்றி மருத்துவரிடம் ஆலோசனை கேள்வி." :
+              "Thank you for your concern. Please consult a healthcare provider for personalized medical advice.",
           confidence: 0,
           reasoning: "Offline mode - limited information available",
           sources: ["Offline Database"],
           contraindications: ["Always consult healthcare professionals for medical decisions"]
         };
-      
+
       case 'symptom_analysis':
         return {
           condition: "General Health Concern",
           confidence: 0,
           severity: "moderate",
           description: isHindi ? "आपके लक्षणों के आधार पर, कृपया चिकित्सक से परामर्श करें।" :
-                      isTamil ? "உங்கள் அறிகுறிகளின் அடிப்படையில், தயவுசெய்து மருத்துவரிடம் ஆலோசனை கேள்வி." :
-                      isTelugu ? "మీ లక్షణాల ఆధారంగా, దయచేసి వైద్యుడిని సంప్రదించండి." :
-                      isBengali ? "আপনার লক্ষণগুলির ভিত্তিতে, দয়া করে একজন চিকিৎসকের সাথে পরামর্শ করুন।" :
-                      isGujarati ? "તમારા લક્ષણોના આધારે, કૃપા કરીને ડૉક્ટરની સલાહ લો." :
-                      isMarathi ? "तुमच्या लक्षणांच्या आधारे, कृपया डॉक्टरांचा सल्ला घ्या." :
+            isTamil ? "உங்கள் அறிகுறிகளின் அடிப்படையில், தயவுசெய்து மருத்துவரிடம் ஆலோசனை கேள்வி." :
+              isTelugu ? "మీ లక్షణాల ఆధారంగా, దయచేసి వైద్యుడిని సంప్రదించండి." :
+                isBengali ? "আপনার লক্ষণগুলির ভিত্তিতে, দয়া করে একজন চিকিৎসকের সাথে পরামর্শ করুন।" :
+                  isGujarati ? "તમારા લક્ષણોના આધારે, કૃપા કરીને ડૉક્ટરની સલાહ લો." :
+                    isMarathi ? "तुमच्या लक्षणांच्या आधारे, कृपया डॉक्टरांचा सल्ला घ्या." :
                       isKannada ? "ನಿಮ್ಮ ಲಕ್ಷಣಗಳ ಆಧಾರದ ಮೇಲೆ, ದಯವಿಟ್ಟು ವೈದ್ಯರನ್ನು ಸಂಪರ್ಕಿಸಿ." :
-                      isMalayalam ? "നിങ്ങളുടെ ലക്ഷണങ്ങളുടെ അടിസ്ഥാനത്തിൽ, ദയവായി ഒരു വൈദ്യനെ സമീപിക്കുക." :
-                      isPunjabi ? "ਤੁਹਾਡੇ ਲੱਛਣਾਂ ਦੇ ਆਧਾਰ 'ਤੇ, ਕਿਰਪਾ ਕਰਕੇ ਡਾਕਟਰ ਨਾਲ ਸਲਾਹ ਲਓ." :
-                      isOdia ? "ତୁମର ଲକ୍ଷଣଗୁଡ଼ିକର ଆଧାରରେ, ଦୟାକରି ଜଣେ ଡାକ୍ତରଙ୍କ ସହିତ ପରାମର୍ଶ କରନ୍ତୁ।" :
-                      isAssamese ? "আপোনাৰ লক্ষণসমূহৰ ভিত্তিত, অনুগ্ৰহ কৰি এজন চিকিৎসকৰ লগত পৰামৰ্শ লওক।" :
-                      "Based on your symptoms, please consult a healthcare provider.",
+                        isMalayalam ? "നിങ്ങളുടെ ലക്ഷണങ്ങളുടെ അടിസ്ഥാനത്തിൽ, ദയവായി ഒരു വൈദ്യനെ സമീപിക്കുക." :
+                          isPunjabi ? "ਤੁਹਾਡੇ ਲੱਛਣਾਂ ਦੇ ਆਧਾਰ 'ਤੇ, ਕਿਰਪਾ ਕਰਕੇ ਡਾਕਟਰ ਨਾਲ ਸਲਾਹ ਲਓ." :
+                            isOdia ? "ତୁମର ଲକ୍ଷଣଗୁଡ଼ିକର ଆଧାରରେ, ଦୟାକରି ଜଣେ ଡାକ୍ତରଙ୍କ ସହିତ ପରାମର୍ଶ କରନ୍ତୁ।" :
+                              isAssamese ? "আপোনাৰ লক্ষণসমূহৰ ভিত্তিত, অনুগ্ৰহ কৰি এজন চিকিৎসকৰ লগত পৰামৰ্শ লওক।" :
+                                "Based on your symptoms, please consult a healthcare provider.",
           suggestions: isHindi ? [
             "अपने डॉक्टर से अपॉइंटमेंट लें",
             "लक्षणों की डायरी रखें",
@@ -604,13 +698,13 @@ Example response format:
           ],
           reasoning: "Offline mode - limited analysis available",
           emergency_contact: isHindi ? "आपातकाल के लिए, तुरंत अपने स्थानीय आपातकालीन नंबर पर कॉल करें।" :
-                            isTamil ? "அவசரநிலைக்கு, உடனடியாக உங்கள் உள்ளூர் அவசரகால எண்ணை அழைக்கவும்." :
-                            "For emergencies, call your local emergency number immediately.",
+            isTamil ? "அவசரநிலைக்கு, உடனடியாக உங்கள் உள்ளூர் அவசரகால எண்ணை அழைக்கவும்." :
+              "For emergencies, call your local emergency number immediately.",
           follow_up: isHindi ? "उचित निदान और उपचार के लिए कृपया एक स्वास्थ्य सेवा प्रदाता से परामर्श करें।" :
-                    isTamil ? "சரியான நோயறிதல் மற்றும் சிகிச்சைக்கு தயவுசெய்து ஒரு சுகாதார சேவை வழங்குநரை அணுகவும்." :
-                    "Please consult a healthcare provider for proper diagnosis and treatment."
+            isTamil ? "சரியான நோயறிதல் மற்றும் சிகிச்சைக்கு தயவுசெய்து ஒரு சுகாதார சேவை வழங்குநரை அணுகவும்." :
+              "Please consult a healthcare provider for proper diagnosis and treatment."
         };
-      
+
       default:
         return {
           message: "Service temporarily unavailable due to API quota limits. Please try again later or consult a healthcare provider.",

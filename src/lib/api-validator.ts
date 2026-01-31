@@ -13,7 +13,7 @@ export interface APIValidationResult {
 
 export class APIValidator {
   private static readonly API_KEY = import.meta.env.VITE_GOOGLE_AI_STUDIO_KEY;
-  private static readonly BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+  private static readonly BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
   /**
    * Test if the Gemini API is working and returning real AI responses
