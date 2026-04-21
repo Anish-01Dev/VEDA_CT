@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Moon, Sun, Clock, Heart, Zap, Activity } from "lucide-react";
+import { ArrowLeft, Moon, Sun, Clock, Activity, BedDouble, Zap, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/navigation/bottom-nav";
 import { navItems } from "@/lib/navigation-config";
@@ -51,6 +51,7 @@ const SleepHealthPage = () => {
     
     try {
       const API_KEY = 'REDACTED_GOOGLE_API_KEY';
+      const MODEL = 'gemini-3-flash-preview';
       const bedTime = new Date(`2024-01-01 ${sleepData.bedtime}`);
       const wakeTime = new Date(`2024-01-01 ${sleepData.wakeTime}`);
       let sleepDuration = (wakeTime.getTime() - bedTime.getTime()) / (1000 * 60 * 60);
@@ -70,7 +71,7 @@ const SleepHealthPage = () => {
         ? `CRITICAL: All recommendations, insights, and analysis MUST be written ONLY in ${targetLanguage}. Do not use any English words or phrases.`
         : '';
       
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${API_KEY}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -239,68 +240,104 @@ const SleepHealthPage = () => {
           </Card>
 
           {analysis && (
-            <Card className="bg-white border border-[#E2E8F0]">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg font-bold text-[#2D3748] font-nunito">
-                  <Activity className="w-5 h-5 text-[#4A9B8E]" />
-                  {t('sleep.analysis')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-[#4A9B8E] mb-2 font-nunito">{analysis.sleepScore}/100</div>
-                  <Badge variant={analysis.sleepScore >= 80 ? "default" : analysis.sleepScore >= 60 ? "secondary" : "destructive"} className="bg-[#38A169] text-white">
-                    {analysis.sleepScore >= 80 
-                      ? t('excellent')
-                      : analysis.sleepScore >= 60 
-                      ? t('good')
-                      : t('needs.improvement')
-                    }
+            <AnimatePresence>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="space-y-4"
+            >
+              {/* Score Card */}
+              <Card className="bg-gradient-to-br from-[#2A9D8F] to-[#4A9B8E] text-white border-0">
+                <CardContent className="p-6 text-center">
+                  <div className="text-5xl font-bold mb-1">{analysis.sleepScore}</div>
+                  <div className="text-white/80 text-sm mb-3">Sleep Score / 100</div>
+                  <Badge className={`${
+                    analysis.sleepScore >= 80 ? 'bg-green-400' :
+                    analysis.sleepScore >= 60 ? 'bg-yellow-400 text-gray-800' : 'bg-red-400'
+                  } border-0 text-sm px-3 py-1`}>
+                    {analysis.sleepScore >= 80 ? '😴 Excellent' : analysis.sleepScore >= 60 ? '😐 Good' : '😟 Needs Improvement'}
                   </Badge>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-center">
-                  <div>
-                    <div className="text-2xl font-bold text-[#2D3748] font-nunito">{analysis.sleepDuration}h</div>
-                    <div className="text-sm text-[#4A5568] font-inter">
-                      {t('total.sleep')}
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="bg-white/20 rounded-lg p-3">
+                      <div className="text-2xl font-bold">{analysis.sleepDuration}h</div>
+                      <div className="text-xs text-white/80">{t('total.sleep')}</div>
+                    </div>
+                    <div className="bg-white/20 rounded-lg p-3">
+                      <div className="text-2xl font-bold">{analysis.sleepPhases?.deep || 0}h</div>
+                      <div className="text-xs text-white/80">{t('deep.sleep')}</div>
                     </div>
                   </div>
-                  <div>
-                    <div className="text-2xl font-bold text-[#4A9B8E] font-nunito">{analysis.sleepPhases.deep}h</div>
-                    <div className="text-sm text-[#4A5568] font-inter">
-                      {t('deep.sleep')}
-                    </div>
-                  </div>
-                </div>
+                </CardContent>
+              </Card>
 
-                <div className="space-y-3">
-                  <h4 className="font-semibold text-[#2D3748] font-nunito">
-                    {t('ai.recommendations')}
-                  </h4>
-                  <div className="space-y-2">
-                    {analysis.recommendations?.map((rec, index) => (
-                      <div key={index} className="flex items-start gap-3 p-3 bg-[#F8F5F0] rounded-lg">
-                        <div className="w-6 h-6 bg-[#4A9B8E20] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <span className="text-xs font-bold text-[#4A9B8E]">{index + 1}</span>
-                        </div>
-                        <p className="text-sm text-[#4A5568] font-inter leading-relaxed">
-                          {rec}
-                        </p>
+              {/* Sleep Phases Bar */}
+              <Card className="bg-white border border-[#E2E8F0]">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold text-[#2D3748]">Sleep Phases</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {[
+                    { label: 'Deep Sleep', value: analysis.sleepPhases?.deep || 0, color: 'bg-[#2A9D8F]', icon: '🌊' },
+                    { label: 'REM Sleep', value: analysis.sleepPhases?.rem || 0, color: 'bg-purple-500', icon: '💭' },
+                    { label: 'Light Sleep', value: analysis.sleepPhases?.light || 0, color: 'bg-blue-300', icon: '☁️' },
+                  ].map((phase) => (
+                    <div key={phase.label}>
+                      <div className="flex justify-between text-xs text-[#4A5568] mb-1">
+                        <span>{phase.icon} {phase.label}</span>
+                        <span className="font-semibold">{phase.value}h</span>
                       </div>
-                    ))}
-                  </div>
-                  {analysis.insights && (
-                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <h5 className="font-semibold text-blue-800 mb-2">
-                        {t('sleep.insights')}
-                      </h5>
-                      <p className="text-sm text-blue-700">{analysis.insights}</p>
+                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(phase.value / parseFloat(analysis.sleepDuration)) * 100}%` }}
+                          transition={{ duration: 1, ease: 'easeOut' }}
+                          className={`h-full rounded-full ${phase.color}`}
+                        />
+                      </div>
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* Insights */}
+              {analysis.insights && (
+                <Card className="bg-blue-50 border border-blue-200">
+                  <CardContent className="p-4">
+                    <div className="flex gap-2">
+                      <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <p className="text-sm text-blue-800 leading-relaxed">{analysis.insights}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Recommendations */}
+              <Card className="bg-white border border-[#E2E8F0]">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold text-[#2D3748] flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-[#4A9B8E]" />
+                    {t('ai.recommendations')}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {analysis.recommendations?.map((rec: string, index: number) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="flex items-start gap-3 p-3 bg-[#F8F5F0] rounded-lg"
+                    >
+                      <div className="w-5 h-5 bg-[#4A9B8E] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-xs font-bold text-white">{index + 1}</span>
+                      </div>
+                      <p className="text-sm text-[#4A5568] leading-relaxed">{rec}</p>
+                    </motion.div>
+                  ))}
+                </CardContent>
+              </Card>
+            </motion.div>
+            </AnimatePresence>
           )}
         </motion.div>
       </main>

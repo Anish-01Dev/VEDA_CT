@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/language-context";
 import { GlobalGuideProvider } from "@/contexts/guide-context";
 import { AuthProvider } from "@/contexts/auth-context";
-import AITerminalLogger from "@/components/debug/AITerminalLogger";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import HealthPage from "./pages/HealthPage";
@@ -43,7 +42,6 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <AITerminalLogger />
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <GlobalGuideProvider>
             <Routes>

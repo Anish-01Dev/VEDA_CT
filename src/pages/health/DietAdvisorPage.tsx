@@ -89,112 +89,52 @@ const DietAdvisorPage = () => {
   const analyzeFood = async () => {
     if (!selectedImage) return;
     setIsAnalyzing(true);
-    
     aiLogger.aiStart('Diet Advisor', 'Food Analysis', selectedImage.name);
-    
     try {
-      const API_KEY = import.meta.env.VITE_GOOGLE_AI_STUDIO_KEY;
-      console.log('🔑 API Key Status:', API_KEY ? 'Present' : 'Missing');
-      console.log('📁 Selected Image:', selectedImage.name, selectedImage.type, selectedImage.size);
-      
+      const API_KEY = 'REDACTED_GOOGLE_API_KEY';
       const base64Image = await convertToBase64(selectedImage);
-      console.log('🖼️ Base64 Image Length:', base64Image.length);
-      
       const requestBody = {
         contents: [{
           parts: [
             {
-              text: `Look at this food image carefully and analyze what you see. Provide detailed nutritional analysis based on the ACTUAL food visible in the image.
-              
-              Return ONLY valid JSON:
-              {
-                "name": "exact name of the dish/food you see",
-                "calories": actual_estimated_calories_for_this_portion,
-                "ingredients": ["list every ingredient you can identify in the image"],
-                "macros": {
-                  "protein": grams_based_on_visible_food,
-                  "carbs": grams_based_on_visible_food,
-                  "fats": grams_based_on_visible_food,
-                  "fiber": grams_based_on_visible_food
-                },
-                "healthScore": score_0_to_100_based_on_this_specific_food,
-                "recommendations": ["specific advice for this exact food"],
-                "language": "en"
-              }
-              
-              LANGUAGE REQUIREMENT:
-              - If the user's query or context suggests Hindi, Tamil, Telugu, Bengali, Gujarati, Marathi, Kannada, Malayalam, Punjabi, Odia, or Assamese, respond in that language
-              - Otherwise, respond in English
-              - Include the detected language in the response
-              
-              CRITICAL: 
-              - Base your analysis ONLY on what you actually see in the image
-              - Don't give generic responses
-              - Medical condition context: ${profile.medicalCondition || 'general health'}
-              - Respond in the appropriate language based on user context`
+              text: `Analyze this food image. Return ONLY valid JSON:
+{
+  "name": "exact dish name",
+  "calories": estimated_calories,
+  "ingredients": ["ingredient1", "ingredient2"],
+  "macros": { "protein": grams, "carbs": grams, "fats": grams, "fiber": grams },
+  "healthScore": 0_to_100,
+  "recommendations": ["tip1", "tip2"]
+}
+Medical context: ${profile.medicalCondition || 'general health'}. Base analysis ONLY on what you see.`
             },
             {
               inline_data: {
-                mime_type: selectedImage.type.includes('png') ? "image/png" : "image/jpeg",
+                mime_type: selectedImage.type.includes('png') ? 'image/png' : 'image/jpeg',
                 data: base64Image
               }
             }
           ]
         }],
-        generationConfig: {
-          temperature: 0.1,
-          topK: 32,
-          topP: 1,
-          maxOutputTokens: 1024
-        }
+        generationConfig: { temperature: 0.1, maxOutputTokens: 1024 }
       };
-      
-      console.log('📤 Making API Request to Gemini...');
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
       });
-
-      console.log('📥 API Response Status:', response.status, response.statusText);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ API Error Response:', errorText);
-        throw new Error(`API failed: ${response.status} - ${errorText}`);
-      }
-
+      if (!response.ok) throw new Error(`API failed: ${response.status}`);
       const data = await response.json();
-      console.log('📊 Full API Response:', data);
-      
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      console.log('🤖 AI Response Text:', text);
-      
-      if (!text) {
-        throw new Error('No response from AI');
-      }
-
+      if (!text) throw new Error('No response from AI');
       const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        console.error('❌ No JSON found in response:', text);
-        throw new Error('No JSON found in response');
-      }
-
-      console.log('🔍 Extracted JSON:', jsonMatch[0]);
+      if (!jsonMatch) throw new Error('No JSON in response');
       const parsed = JSON.parse(jsonMatch[0]);
-      console.log('✅ Parsed Analysis:', parsed);
-      
       setFoodAnalysis(parsed);
-      aiLogger.aiSuccess('Diet Advisor', 'Food Analysis', { 
-        food: parsed.name, 
-        calories: parsed.calories 
-      });
-      
+      aiLogger.aiSuccess('Diet Advisor', 'Food Analysis', { food: parsed.name, calories: parsed.calories });
     } catch (error) {
       aiLogger.aiError('Diet Advisor', 'Food Analysis', error);
-      console.error('❌ Food analysis failed:', error);
-      setFoodAnalysis(null);
-      alert(`Analysis failed: ${error.message}. Check console for details.`);
+      alert(`Analysis failed: ${error.message}`);
     } finally {
       setIsAnalyzing(false);
     }
@@ -202,89 +142,50 @@ const DietAdvisorPage = () => {
 
   const generateMealPlan = async () => {
     if (!profile.age || !profile.weight || !profile.height || !profile.activity || !profile.goal) return;
-    
     setIsGenerating(true);
-    
-    const profileData = {
-      age: profile.age,
-      weight: profile.weight,
-      height: profile.height,
-      activity: profile.activity,
-      goal: profile.goal,
-      dietary: profile.dietary,
-      medical: profile.medicalCondition,
-      allergies: profile.allergies
-    };
-    
-    aiLogger.aiStart('Diet Advisor', 'Meal Plan Generation', profileData);
-    
+    aiLogger.aiStart('Diet Advisor', 'Meal Plan Generation', profile);
     try {
-      const API_KEY = import.meta.env.VITE_GOOGLE_AI_STUDIO_KEY;
-      console.log('🔑 API Key Status:', API_KEY ? 'Present' : 'Missing');
-      console.log('👤 User Profile:', profile);
-      console.log('🍽️ Generating meal plan for:', {
-        age: profile.age,
-        weight: profile.weight,
-        height: profile.height,
-        activity: profile.activity,
-        goal: profile.goal,
-        dietary: profile.dietary,
-        medical: profile.medicalCondition,
-        allergies: profile.allergies
-      });
-      
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+      const API_KEY = 'REDACTED_GOOGLE_API_KEY';
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${API_KEY}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{
             parts: [{
-              text: `Create personalized Indian meal plan for: Age ${profile.age}, Weight ${profile.weight}kg, Height ${profile.height}cm, Activity: ${profile.activity}, Goal: ${profile.goal}, Diet: ${profile.dietary || 'any'}, Medical: ${profile.medicalCondition || 'none'}, Allergies: ${profile.allergies || 'none'}. Calculate BMR, adjust for activity and goal. Return JSON: {"dailyCalories": number, "macros": {"protein": grams, "carbs": grams, "fats": grams}, "meals": {"breakfast": {"name": "dish", "calories": number, "items": ["ingredients"]}, "lunch": {"name": "dish", "calories": number, "items": ["ingredients"]}, "dinner": {"name": "dish", "calories": number, "items": ["ingredients"]}, "snacks": {"name": "snacks", "calories": number, "items": ["items"]}}, "medicalTips": ["tips"], "indianFoods": ["recommendations"]}. Use authentic Indian dishes, match dietary preference, avoid allergies, address medical condition.`
+              text: `Create a personalized Indian meal plan. Return ONLY valid JSON:
+{
+  "dailyCalories": number,
+  "bmi": number,
+  "bmiCategory": "Underweight|Normal|Overweight|Obese",
+  "macros": { "protein": grams, "carbs": grams, "fats": grams },
+  "meals": {
+    "breakfast": { "name": "dish", "calories": number, "items": ["item1"] },
+    "lunch": { "name": "dish", "calories": number, "items": ["item1"] },
+    "dinner": { "name": "dish", "calories": number, "items": ["item1"] },
+    "snacks": { "name": "snack", "calories": number, "items": ["item1"] }
+  },
+  "medicalTips": ["tip1"],
+  "indianFoods": ["recommendation1"],
+  "waterIntake": "X liters per day",
+  "avoidFoods": ["food1"]
+}
+Profile: Age ${profile.age}, Weight ${profile.weight}kg, Height ${profile.height}cm, Activity: ${profile.activity}, Goal: ${profile.goal}, Diet: ${profile.dietary || 'any'}, Medical: ${profile.medicalCondition || 'none'}, Allergies: ${profile.allergies || 'none'}.`
             }]
           }]
         })
       });
-
-      console.log('📥 API Response Status:', response.status, response.statusText);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ API Error Response:', errorText);
-        throw new Error(`API failed: ${response.status} - ${errorText}`);
-      }
-
+      if (!response.ok) throw new Error(`API failed: ${response.status}`);
       const data = await response.json();
-      console.log('📊 Full API Response:', data);
-      
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      console.log('🤖 AI Response Text:', text);
-      
-      if (!text) {
-        throw new Error('No response from AI');
-      }
-
+      if (!text) throw new Error('No response from AI');
       const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        console.error('❌ No JSON found in response:', text);
-        throw new Error('No JSON found in response');
-      }
-
-      console.log('🔍 Extracted JSON:', jsonMatch[0]);
+      if (!jsonMatch) throw new Error('No JSON in response');
       const parsed = JSON.parse(jsonMatch[0]);
-      console.log('✅ Parsed Meal Plan:', parsed);
-      
       setMealPlan(parsed);
-      aiLogger.aiSuccess('Diet Advisor', 'Meal Plan Generation', { 
-        calories: parsed.dailyCalories,
-        meals: Object.keys(parsed.meals || {}).length 
-      });
+      aiLogger.aiSuccess('Diet Advisor', 'Meal Plan Generation', { calories: parsed.dailyCalories });
     } catch (error) {
       aiLogger.aiError('Diet Advisor', 'Meal Plan Generation', error);
-      console.error('❌ Meal plan generation failed:', error);
-      setMealPlan(null);
-      alert(`Meal plan generation failed: ${error.message}. Please try again.`);
+      alert(`Meal plan generation failed: ${error.message}`);
     } finally {
       setIsGenerating(false);
     }
@@ -504,83 +405,99 @@ const DietAdvisorPage = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="text-center p-4 bg-[#F8F5F0] rounded-lg">
-                  <div className="text-2xl font-bold text-[#4A9B8E] font-nunito mb-1">{mealPlan.dailyCalories}</div>
-                  <div className="text-sm text-[#4A5568] font-inter">Daily Calories</div>
+                {/* BMI + Calories */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="text-center p-4 bg-gradient-to-br from-[#4A9B8E] to-[#2A9D8F] rounded-lg text-white">
+                    <div className="text-2xl font-bold">{mealPlan.dailyCalories}</div>
+                    <div className="text-xs text-white/80">Daily Calories</div>
+                  </div>
+                  {mealPlan.bmi && (
+                    <div className="text-center p-4 bg-[#F8F5F0] rounded-lg">
+                      <div className="text-2xl font-bold text-[#2D3748]">{mealPlan.bmi}</div>
+                      <div className="text-xs text-[#4A5568]">BMI — {mealPlan.bmiCategory}</div>
+                    </div>
+                  )}
                 </div>
 
+                {/* Macros */}
                 {mealPlan.macros && (
-                  <div className="grid grid-cols-3 gap-3 text-center">
-                    <div className="p-3 bg-[#F8F5F0] rounded-lg">
-                      <div className="text-lg font-bold text-[#2D3748] font-nunito">{mealPlan.macros.protein || 0}g</div>
-                      <div className="text-xs text-[#4A5568] font-inter">Protein</div>
-                    </div>
-                    <div className="p-3 bg-[#F8F5F0] rounded-lg">
-                      <div className="text-lg font-bold text-[#2D3748] font-nunito">{mealPlan.macros.carbs || 0}g</div>
-                      <div className="text-xs text-[#4A5568] font-inter">Carbs</div>
-                    </div>
-                    <div className="p-3 bg-[#F8F5F0] rounded-lg">
-                      <div className="text-lg font-bold text-[#2D3748] font-nunito">{mealPlan.macros.fats || 0}g</div>
-                      <div className="text-xs text-[#4A5568] font-inter">Fats</div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    {[['Protein', mealPlan.macros.protein, 'bg-blue-50 text-blue-700'], ['Carbs', mealPlan.macros.carbs, 'bg-yellow-50 text-yellow-700'], ['Fats', mealPlan.macros.fats, 'bg-red-50 text-red-700']].map(([label, val, cls]) => (
+                      <div key={label as string} className={`p-3 rounded-lg ${cls}`}>
+                        <div className="text-lg font-bold">{val}g</div>
+                        <div className="text-xs">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Water Intake */}
+                {mealPlan.waterIntake && (
+                  <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <span className="text-2xl">💧</span>
+                    <div>
+                      <div className="text-sm font-semibold text-blue-800">Water Intake</div>
+                      <div className="text-sm text-blue-700">{mealPlan.waterIntake}</div>
                     </div>
                   </div>
                 )}
 
+                {/* Meals */}
                 {mealPlan.meals && (
-                  <div className="space-y-3">
-                    <h4 className="font-semibold text-[#2D3748] font-nunito">Daily Meals:</h4>
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-[#2D3748] font-nunito">Daily Meals</h4>
                     {Object.entries(mealPlan.meals).map(([meal, data]: [string, any]) => (
                       <div key={meal} className="p-3 bg-[#F8F5F0] rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <h5 className="font-semibold text-sm text-[#2D3748] font-nunito capitalize">{meal}</h5>
-                          <span className="text-xs text-[#4A5568] font-inter">{data?.calories || 0} cal</span>
+                        <div className="flex items-center justify-between mb-1">
+                          <h5 className="font-semibold text-sm text-[#2D3748] capitalize">{meal}</h5>
+                          <Badge className="bg-[#4A9B8E] text-white text-xs">{data?.calories || 0} cal</Badge>
                         </div>
-                        <p className="text-sm text-[#4A5568] font-inter mb-2">{data?.name || 'Meal'}</p>
+                        <p className="text-sm font-medium text-[#4A5568] mb-2">{data?.name}</p>
                         <div className="flex flex-wrap gap-1">
-                          {data?.items?.map((item: string, index: number) => (
-                            <Badge key={index} variant="outline" className="text-xs bg-white border-[#E2E8F0] text-[#4A5568]">
-                              {item}
-                            </Badge>
-                          )) || []}
+                          {data?.items?.map((item: string, i: number) => (
+                            <Badge key={i} variant="outline" className="text-xs bg-white border-[#E2E8F0] text-[#4A5568]">{item}</Badge>
+                          ))}
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
 
-                {mealPlan.medicalTips && mealPlan.medicalTips.length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="font-semibold text-[#2D3748] font-nunito">Medical Condition Tips:</h4>
-                    <div className="space-y-2">
-                      {mealPlan.medicalTips.map((tip: string, index: number) => (
-                        <div key={index} className="flex items-start gap-3 p-3 bg-red-50 rounded-lg border border-red-200">
-                          <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <span className="text-xs font-bold text-red-600">!</span>
-                          </div>
-                          <p className="text-sm text-red-700 font-inter leading-relaxed">
-                            {tip}
-                          </p>
-                        </div>
+                {/* Avoid Foods */}
+                {mealPlan.avoidFoods && mealPlan.avoidFoods.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-red-700 flex items-center gap-2">🚫 Foods to Avoid</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {mealPlan.avoidFoods.map((food: string, i: number) => (
+                        <Badge key={i} variant="outline" className="bg-red-50 border-red-200 text-red-700 text-xs">{food}</Badge>
                       ))}
                     </div>
                   </div>
                 )}
 
+                {/* Medical Tips */}
+                {mealPlan.medicalTips && mealPlan.medicalTips.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-[#2D3748]">⚕️ Medical Tips</h4>
+                    {mealPlan.medicalTips.map((tip: string, i: number) => (
+                      <div key={i} className="flex items-start gap-2 p-3 bg-red-50 rounded-lg border border-red-200">
+                        <span className="text-red-600 font-bold text-sm mt-0.5">!</span>
+                        <p className="text-sm text-red-700">{tip}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Indian Food Tips */}
                 {mealPlan.indianFoods && mealPlan.indianFoods.length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="font-semibold text-[#2D3748] font-nunito">Indian Food Tips:</h4>
-                    <div className="space-y-2">
-                      {mealPlan.indianFoods.map((tip: string, index: number) => (
-                        <div key={index} className="flex items-start gap-3 p-3 bg-[#F8F5F0] rounded-lg">
-                          <div className="w-6 h-6 bg-[#F6E05E20] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <span className="text-xs font-bold text-[#F6E05E]">{index + 1}</span>
-                          </div>
-                          <p className="text-sm text-[#4A5568] font-inter leading-relaxed">
-                            {tip}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-[#2D3748]">🍛 Indian Food Tips</h4>
+                    {mealPlan.indianFoods.map((tip: string, i: number) => (
+                      <div key={i} className="flex items-start gap-2 p-3 bg-[#F8F5F0] rounded-lg">
+                        <span className="text-[#4A9B8E] font-bold text-sm mt-0.5">{i + 1}</span>
+                        <p className="text-sm text-[#4A5568]">{tip}</p>
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>

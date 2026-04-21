@@ -2,31 +2,20 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { BottomNav } from "@/components/navigation/bottom-nav";
-import { SOSButton } from "@/components/ui/sos-button";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
-import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
 import { useSmoothScroll } from "@/hooks/use-smooth-scroll";
 import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { Bot, Activity, Heart } from "lucide-react";
+import { Bot } from "lucide-react";
 import { useLanguage } from "@/contexts/language-context";
-
-// Import new components
 import { AppTitleBar } from "@/components/layout/app-title-bar";
 import { BackgroundElements } from "@/components/layout/background-elements";
 import { HeroSection } from "@/components/sections/hero-section";
 import { HealthMetricsSection } from "@/components/sections/health-metrics-section";
 import { QuickActionsSection } from "@/components/sections/quick-actions-section";
-import { SymptomCheckerSection } from "@/components/sections/symptom-checker-section";
-
 import { useNavigate } from "react-router-dom";
 import { navItems } from "@/lib/navigation-config";
-import ApiTestComponent from "@/components/debug/ApiTestComponent";
-import EnhancedSymptomCheckerV2 from "@/components/ai/enhanced-symptom-checker-v2";
-import HealthDashboard from "@/components/dashboard/health-dashboard";
-import SimpleAITest from "@/components/debug/SimpleAITest";
 
 
 gsap.registerPlugin(ScrollTrigger);
@@ -88,18 +77,6 @@ const Index = () => {
             <section className="w-full bg-[#F8F5F0] rounded-2xl p-6 health-metrics-section">
               <h2 className="text-2xl font-bold text-[#2D3748] font-nunito mb-6">{t('health.modules')}</h2>
               <HealthMetricsSection />
-            </section>
-
-            {/* API Test Section - Temporary for debugging */}
-            <section className="w-full bg-[#F8F5F0] rounded-2xl p-6">
-              <h2 className="text-2xl font-bold text-[#2D3748] font-nunito mb-6">{t('api.connection.test')}</h2>
-              <ApiTestComponent />
-            </section>
-
-            {/* Simple AI Test */}
-            <section className="w-full bg-[#F8F5F0] rounded-2xl p-6">
-              <h2 className="text-2xl font-bold text-[#2D3748] font-nunito mb-6">🧪 AI Test</h2>
-              <SimpleAITest />
             </section>
           </main>
 

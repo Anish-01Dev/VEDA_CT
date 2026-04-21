@@ -80,53 +80,14 @@ export function NeuroMate({ className }: NeuroMateProps) {
         return;
       }
       
-      const prompt = `As a mental health AI assistant, analyze this emotional expression:
-
-"${message}"
-
-Provide detailed analysis including:
-1. Primary emotional tone (stress/anxiety/burnout/positive/neutral)
-2. Detailed psychological assessment
-3. Specific CBT techniques
-4. Mindfulness exercises
-5. Therapeutic suggestions
-
-IMPORTANT: Be empathetic and provide actionable mental health support.
-
-Return JSON format:
-{
-  "tone": "stress|anxiety|burnout|positive|neutral",
-  "analysis": "detailed emotional and psychological analysis",
-  "suggestions": ["specific CBT technique", "mindfulness exercise", "therapeutic activity"]
-}`;
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=REDACTED_GOOGLE_API_KEY`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { 
-            temperature: 0.7, 
-            maxOutputTokens: 500,
-            topK: 40,
-            topP: 0.95
-          }
-        })
-      });
-
-      const result = await response.json();
-      const text = result.candidates[0].content.parts[0].text;
-      
+      const { ollamaAnalyzeMood } = await import('@/lib/ollama-api');
       let analysis;
       try {
-        const jsonMatch = text.match(/```json\s*({[\s\S]*?})\s*```/) || text.match(/({[\s\S]*?})/);
-        if (jsonMatch) {
-          analysis = JSON.parse(jsonMatch[1]);
-        } else {
-          throw new Error('No JSON found');
-        }
+        const detectedLang = messageLower.match(/[\u0900-\u097F]/) ? 'hi' :
+          messageLower.match(/[\u0B80-\u0BFF]/) ? 'ta' : 'en';
+        analysis = await ollamaAnalyzeMood(message, detectedLang);
       } catch {
-        // Enhanced fallback based on keywords
+        // Keyword-based fallback
         let tone = 'neutral';
         if (messageLower.includes('stress') || messageLower.includes('overwhelm')) tone = 'stress';
         else if (messageLower.includes('anxious') || messageLower.includes('worry')) tone = 'anxiety';
@@ -135,7 +96,7 @@ Return JSON format:
         
         analysis = {
           tone,
-          analysis: text || 'I understand you\'re sharing your feelings with me. Based on what you\'ve expressed, here are some personalized recommendations to support your mental wellness.',
+          analysis: 'I understand you\'re sharing your feelings with me. Based on what you\'ve expressed, here are some personalized recommendations to support your mental wellness.',
           suggestions: [
             'Practice the 4-7-8 breathing technique: inhale for 4, hold for 7, exhale for 8',
             'Try a 5-minute mindfulness meditation focusing on present moment awareness',

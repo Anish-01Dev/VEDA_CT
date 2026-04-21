@@ -1,444 +1,380 @@
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect, useRef } from "react";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import { motion, AnimatePresence } from "framer-motion";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { 
-  ArrowLeft, 
-  MapPin, 
-  Navigation, 
-  Search, 
-  Phone, 
-  Clock,
-  Star,
-  Stethoscope
+import {
+  ArrowLeft, MapPin, Navigation, Search,
+  Star, Stethoscope, Loader2, LocateFixed, X
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/navigation/bottom-nav";
-import { cn } from "@/lib/utils";
 import { navItems } from "@/lib/navigation-config";
 import { osmService, type MedicalFacility } from "@/lib/osm-service";
+import { cn } from "@/lib/utils";
 
-interface HealthcareProvider {
-  id: string;
-  name: string;
-  type: "hospital" | "clinic" | "pharmacy" | "jan-aushadhi";
-  address: string;
-  distance: string;
-  rating: number;
-  phone?: string;
-  hours: string;
-  isOpen: boolean;
-  specialties?: string[];
-}
+// Fix Leaflet default icon paths broken by bundlers
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
 
-const mockProviders: HealthcareProvider[] = [
-  {
-    id: "1",
-    name: "Government General Hospital",
-    type: "hospital",
-    address: "MG Road, Central District",
-    distance: "0.8 km",
-    rating: 4.2,
-    phone: "+91-xxx-xxx-xxxx",
-    hours: "24/7",
-    isOpen: true,
-    specialties: ["Emergency", "General Medicine", "Surgery"]
-  },
-  {
-    id: "2",
-    name: "Jan Aushadhi Kendra #142",
-    type: "jan-aushadhi",
-    address: "Near Bus Stand, Market Area",
-    distance: "1.2 km",
-    rating: 4.5,
-    phone: "+91-xxx-xxx-xxxx",
-    hours: "8 AM - 8 PM",
-    isOpen: true
-  },
-  {
-    id: "3",
-    name: "City Health Clinic",
-    type: "clinic",
-    address: "Gandhi Chowk, Old City", 
-    distance: "1.8 km",
-    rating: 4.0,
-    phone: "+91-xxx-xxx-xxxx",
-    hours: "9 AM - 6 PM",
-    isOpen: false,
-    specialties: ["Family Medicine", "Pediatrics"]
-  },
-  {
-    id: "4",
-    name: "MedPlus Pharmacy",
-    type: "pharmacy",
-    address: "Station Road, Commercial Complex",
-    distance: "2.1 km",
-    rating: 4.3,
-    phone: "+91-xxx-xxx-xxxx",
-    hours: "8 AM - 10 PM",
-    isOpen: true
-  }
+const typeColors: Record<string, string> = {
+  hospital: "bg-red-100 text-red-600 border-red-200",
+  clinic: "bg-teal-100 text-teal-600 border-teal-200",
+  doctor: "bg-teal-100 text-teal-600 border-teal-200",
+  pharmacy: "bg-blue-100 text-blue-600 border-blue-200",
+};
+
+const typeIcon: Record<string, string> = {
+  hospital: "🏥",
+  clinic: "🩺",
+  doctor: "👨‍⚕️",
+  pharmacy: "💊",
+};
+
+const markerColor: Record<string, string> = {
+  hospital: "#E53E3E",
+  clinic: "#4A9B8E",
+  doctor: "#4A9B8E",
+  pharmacy: "#3182CE",
+};
+
+const mockFacilities: MedicalFacility[] = [
+  { id: "1", name: "Government General Hospital", type: "hospital", lat: 28.6139, lon: 77.209, distance: 0.8, address: "MG Road, Central District" },
+  { id: "2", name: "City Health Clinic", type: "clinic", lat: 28.6155, lon: 77.211, distance: 1.2, address: "Gandhi Chowk, Old City" },
+  { id: "3", name: "MedPlus Pharmacy", type: "pharmacy", lat: 28.612, lon: 77.207, distance: 1.8, address: "Station Road, Commercial Complex" },
+  { id: "4", name: "Apollo Clinic", type: "clinic", lat: 28.617, lon: 77.213, distance: 2.1, address: "Sector 12, New Delhi" },
 ];
 
-const typeColors = {
-  hospital: "bg-[#E53E3E20] text-[#E53E3E] border-[#E53E3E]/20",
-  clinic: "bg-[#4A9B8E20] text-[#4A9B8E] border-[#4A9B8E]/20",
-  doctor: "bg-[#4A9B8E20] text-[#4A9B8E] border-[#4A9B8E]/20",
-  pharmacy: "bg-[#3182CE20] text-[#3182CE] border-[#3182CE]/20",
-  "jan-aushadhi": "bg-[#38A16920] text-[#38A169] border-[#38A169]/20"
-};
+const FILTERS = ["all", "hospital", "clinic", "doctor", "pharmacy"] as const;
 
-const typeLabels = {
-  hospital: "Hospital",
-  clinic: "Clinic",
-  doctor: "Doctor", 
-  pharmacy: "Pharmacy",
-  "jan-aushadhi": "Jan Aushadhi"
-};
+function FlyTo({ position }: { position: [number, number] | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (position) map.flyTo(position, 16, { duration: 1 });
+  }, [position, map]);
+  return null;
+}
 
-const MapPage = () => {
+export default function MapPage() {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedType, setSelectedType] = useState<string>("all");
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
-  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
-  const [realFacilities, setRealFacilities] = useState<MedicalFacility[]>([]);
-  const [isLoadingRealData, setIsLoadingRealData] = useState(false);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [userPos, setUserPos] = useState<[number, number] | null>(null);
+  const [facilities, setFacilities] = useState<MedicalFacility[]>(mockFacilities);
+  const [selected, setSelected] = useState<MedicalFacility | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const filteredProviders = realFacilities.length > 0 
-    ? realFacilities.map(facility => ({
-        id: facility.id,
-        name: facility.name,
-        type: facility.type as "hospital" | "clinic" | "pharmacy" | "jan-aushadhi",
-        address: facility.address || 'Address not available',
-        distance: facility.distance < 1 
-          ? `${Math.round(facility.distance * 1000)}m` 
-          : `${facility.distance.toFixed(1)}km`,
-        rating: 4.0,
-        hours: 'Hours not available',
-        isOpen: true,
-        phone: undefined
-      })).filter(provider => {
-        const matchesSearch = provider.name.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesType = selectedType === "all" || provider.type === selectedType;
-        return matchesSearch && matchesType;
-      })
-    : mockProviders.filter(provider => {
-        const matchesSearch = provider.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                             provider.address.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesType = selectedType === "all" || provider.type === selectedType;
-        return matchesSearch && matchesType;
-      });
+  const filtered = facilities.filter(f => {
+    const matchType = filter === "all" || f.type === filter;
+    const matchQuery =
+      f.name.toLowerCase().includes(query.toLowerCase()) ||
+      (f.address ?? "").toLowerCase().includes(query.toLowerCase());
+    return matchType && matchQuery;
+  });
 
-  const requestLocation = () => {
-    console.log('Requesting location...');
-    setIsLoadingLocation(true);
-    
-    if (!navigator.geolocation) {
-      console.error('Geolocation not supported');
-      alert('Geolocation is not supported by this browser.');
-      setIsLoadingLocation(false);
-      return;
-    }
-
+  const locate = () => {
+    if (!navigator.geolocation) return;
+    setLocating(true);
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        console.log('Location obtained:', position.coords);
-        const location = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        };
-        setUserLocation(location);
-        setIsLoadingLocation(false);
-        
-        // Fetch real data from OpenStreetMap
-        setIsLoadingRealData(true);
+      async ({ coords }) => {
+        const pos: [number, number] = [coords.latitude, coords.longitude];
+        setUserPos(pos);
+        setLocating(false);
+        setLoading(true);
         try {
-          const facilities = await osmService.findNearbyMedicalFacilities(
-            location.lat, 
-            location.lng
-          );
-          console.log('Facilities found:', facilities);
-          setRealFacilities(facilities);
-        } catch (error) {
-          console.error('Error fetching real facilities:', error);
+          const data = await osmService.findNearbyMedicalFacilities(coords.latitude, coords.longitude);
+          if (data.length) setFacilities(data);
         } finally {
-          setIsLoadingRealData(false);
+          setLoading(false);
         }
       },
-      (error) => {
-        console.error('Geolocation error:', error);
-        let errorMsg = 'Location access failed';
-        switch(error.code) {
-          case error.PERMISSION_DENIED:
-            errorMsg = 'Location access denied. Please enable location in browser settings.';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMsg = 'Location information unavailable.';
-            break;
-          case error.TIMEOUT:
-            errorMsg = 'Location request timed out.';
-            break;
-        }
-        alert(errorMsg);
-        setIsLoadingLocation(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 60000
-      }
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 15000 }
     );
   };
 
-  useEffect(() => {
-    // Don't auto-request location on page load
-  }, []);
+  const selectFacility = (f: MedicalFacility) => {
+    setSelected(f);
+    cardRefs.current[f.id]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
+
+  const mapCenter: [number, number] = userPos ?? [28.6139, 77.209];
 
   return (
-    <div className="min-h-screen bg-[#FEFCF3] pb-20 font-inter">
+    <div className="flex flex-col h-screen bg-[#FEFCF3] font-inter overflow-hidden">
       {/* Header */}
-      <motion.header 
-        className="sticky top-0 z-50 bg-white/95 border-b border-[#E2E8F0] px-3 sm:px-4 py-3 sm:py-4"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <div className="flex items-center gap-3 max-w-7xl mx-auto">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate("/")}
-            className="hover:bg-[#4A9B8E10]"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[#4A9B8E20] text-[#4A9B8E]">
-              <MapPin className="w-5 h-5" />
+      <header className="shrink-0 z-50 bg-white border-b border-[#E2E8F0] px-4 py-3 flex items-center gap-3">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="hover:bg-[#4A9B8E10]">
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        <div className="p-2 rounded-lg bg-[#4A9B8E20] text-[#4A9B8E]">
+          <MapPin className="w-5 h-5" />
+        </div>
+        <div className="flex-1">
+          <h1 className="text-lg font-bold text-[#2D3748] font-nunito leading-tight">Nearby Healthcare</h1>
+          <p className="text-xs text-[#4A5568]">Hospitals, clinics & pharmacies</p>
+        </div>
+        <Button
+          size="sm"
+          onClick={locate}
+          disabled={locating}
+          className="bg-[#4A9B8E] hover:bg-[#3d8578] text-white gap-1.5 shrink-0"
+        >
+          {locating
+            ? <Loader2 className="w-4 h-4 animate-spin" />
+            : <LocateFixed className="w-4 h-4" />}
+          <span className="hidden sm:inline">{locating ? "Locating…" : "My Location"}</span>
+        </Button>
+      </header>
+
+      {/* Split-screen body */}
+      <div className="flex flex-1 overflow-hidden pb-16 md:pb-0">
+
+        {/* LEFT — Clinic list panel */}
+        <div className="w-full md:w-[380px] shrink-0 flex flex-col border-r border-[#E2E8F0] bg-white overflow-hidden">
+
+          {/* Search + filters */}
+          <div className="p-3 space-y-2 border-b border-[#E2E8F0] shrink-0">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4A5568]" />
+              <Input
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Search facilities…"
+                className="pl-9 h-9 text-sm border-[#E2E8F0] focus:border-[#4A9B8E]"
+              />
+              {query && (
+                <button onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <X className="w-3.5 h-3.5 text-[#4A5568]" />
+                </button>
+              )}
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-[#2D3748] font-nunito">Nearby Healthcare</h1>
-              <p className="text-sm text-[#4A5568] font-inter">Find hospitals, clinics & pharmacies</p>
+            <div className="flex gap-1.5 flex-wrap">
+              {FILTERS.map(t => (
+                <button
+                  key={t}
+                  onClick={() => setFilter(t)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors",
+                    filter === t
+                      ? "bg-[#4A9B8E] text-white border-[#4A9B8E]"
+                      : "bg-white text-[#4A5568] border-[#E2E8F0] hover:bg-[#F8F5F0]"
+                  )}
+                >
+                  {t === "all" ? "All" : t.charAt(0).toUpperCase() + t.slice(1)}
+                </button>
+              ))}
             </div>
           </div>
-        </div>
-      </motion.header>
 
-      <main className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 max-w-7xl mx-auto">
-        {/* Search and Filters */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-[#F8F5F0] rounded-2xl p-6"
-        >
-          <Card className="bg-white border border-[#E2E8F0]">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-bold text-[#2D3748] font-nunito flex items-center gap-2">
-                <Search className="w-5 h-5 text-[#4A9B8E]" />
-                Search & Filter
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Search Input */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#4A5568]" />
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search hospitals, clinics, pharmacies..."
-                  className="pl-10 border-[#E2E8F0] focus:border-[#4A9B8E] focus:ring-[#4A9B8E]"
-                />
+          {/* Cards list */}
+          <div className="flex-1 overflow-y-auto">
+            {loading && (
+              <div className="flex items-center justify-center gap-2 py-10 text-[#4A9B8E]">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span className="text-sm">Finding nearby facilities…</span>
               </div>
+            )}
 
-              {/* Type Filters */}
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant={selectedType === "all" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedType("all")}
-                  className={`text-xs sm:text-sm font-semibold ${
-                    selectedType === "all" 
-                      ? 'bg-[#4A9B8E] hover:bg-[#4A9B8E]/90 text-white' 
-                      : 'border-[#E2E8F0] hover:bg-[#F8F5F0] text-[#2D3748]'
-                  }`}
+            {!loading && filtered.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-14 text-[#4A5568]">
+                <Stethoscope className="w-10 h-10 mb-2 opacity-30" />
+                <p className="text-sm">No facilities found</p>
+              </div>
+            )}
+
+            <AnimatePresence>
+              {!loading && filtered.map((f, i) => (
+                <motion.div
+                  key={f.id}
+                  ref={el => { cardRefs.current[f.id] = el; }}
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ delay: i * 0.04 }}
+                  onClick={() => selectFacility(f)}
+                  className={cn(
+                    "p-4 border-b border-[#F0EDE8] cursor-pointer transition-all",
+                    selected?.id === f.id
+                      ? "bg-[#4A9B8E08] border-l-[3px] border-l-[#4A9B8E]"
+                      : "hover:bg-[#FAFAF8] border-l-[3px] border-l-transparent"
+                  )}
                 >
-                  All
-                </Button>
-                {['hospital', 'clinic', 'doctor', 'pharmacy'].map((type) => (
-                  <Button
-                    key={type}
-                    variant={selectedType === type ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedType(type)}
-                    className={`text-xs sm:text-sm font-semibold ${
-                      selectedType === type 
-                        ? 'bg-[#4A9B8E] hover:bg-[#4A9B8E]/90 text-white' 
-                        : 'border-[#E2E8F0] hover:bg-[#F8F5F0] text-[#2D3748]'
-                    }`}
-                  >
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </Button>
-                ))}
-              </div>
-
-              {/* Location Status */}
-              <div className="flex items-center gap-3 p-3 bg-[#F8F5F0] rounded-lg">
-                <div className="w-8 h-8 bg-[#4A9B8E20] rounded-full flex items-center justify-center">
-                  <MapPin className="w-4 h-4 text-[#4A9B8E]" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-[#2D3748] font-nunito">
-                    {userLocation ? "Location Found" : "Location Required"}
-                  </p>
-                  <p className="text-xs text-[#4A5568] font-inter">
-                    {userLocation 
-                      ? `Lat: ${userLocation.lat.toFixed(4)}, Lng: ${userLocation.lng.toFixed(4)}`
-                      : "Click to enable location access"
-                    }
-                  </p>
-                </div>
-                {!userLocation && (
-                  <Button 
-                    onClick={requestLocation} 
-                    disabled={isLoadingLocation}
-                    size="sm"
-                    className="bg-[#4A9B8E] hover:bg-[#4A9B8E]/90"
-                  >
-                    {isLoadingLocation ? "Getting..." : "Enable"}
-                  </Button>
-                )}
-                {isLoadingLocation && (
-                  <div className="w-4 h-4 border-2 border-[#4A9B8E]/30 border-t-[#4A9B8E] rounded-full animate-spin" />
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.section>
-
-        {/* Results */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-[#F8F5F0] rounded-2xl p-6"
-        >
-          <Card className="bg-white border border-[#E2E8F0]">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-bold text-[#2D3748] font-nunito flex items-center gap-2">
-                <Stethoscope className="w-5 h-5 text-[#4A9B8E]" />
-                Healthcare Providers ({filteredProviders.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {filteredProviders.map((provider, index) => (
-                  <motion.div
-                    key={provider.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="p-4 bg-[#F8F5F0] rounded-lg space-y-3"
-                  >
-                    {/* Header */}
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-[#2D3748] font-nunito mb-1">
-                          {provider.name}
-                        </h3>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge className={cn("text-xs", typeColors[provider.type])}>
-                            {typeLabels[provider.type]}
-                          </Badge>
-                          <Badge variant={provider.isOpen ? "default" : "outline"} 
-                                 className={cn("text-xs", 
-                                   provider.isOpen 
-                                     ? "bg-[#38A169] text-white" 
-                                     : "border-[#E2E8F0] text-[#4A5568] bg-white"
-                                 )}>
-                            {provider.isOpen ? "Open" : "Closed"}
-                          </Badge>
-                        </div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-base leading-none">{typeIcon[f.type] ?? "🏥"}</span>
+                        <h3 className="font-semibold text-[#2D3748] text-sm font-nunito truncate">{f.name}</h3>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 text-[#F6E05E] fill-current" />
-                        <span className="text-sm font-semibold text-[#2D3748] font-nunito">
-                          {provider.rating}
+                      <div className="flex items-center gap-1.5 flex-wrap mb-2">
+                        <Badge className={cn("text-xs px-1.5 py-0 border", typeColors[f.type])}>
+                          {f.type.charAt(0).toUpperCase() + f.type.slice(1)}
+                        </Badge>
+                        <span className="text-xs text-[#4A5568] flex items-center gap-0.5">
+                          <Navigation className="w-3 h-3" />
+                          {f.distance < 1
+                            ? `${Math.round(f.distance * 1000)}m`
+                            : `${f.distance.toFixed(1)}km`}
                         </span>
                       </div>
-                    </div>
-
-                    {/* Details */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-[#4A9B8E]" />
-                        <span className="text-sm text-[#4A5568] font-inter">{provider.address}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Navigation className="w-4 h-4 text-[#4A9B8E]" />
-                        <span className="text-sm text-[#4A5568] font-inter">{provider.distance}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-[#4A9B8E]" />
-                        <span className="text-sm text-[#4A5568] font-inter">{provider.hours}</span>
-                      </div>
-                    </div>
-
-                    {/* Specialties */}
-                    {provider.specialties && provider.specialties.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {provider.specialties.map((specialty, idx) => (
-                          <Badge key={idx} variant="outline" className="text-xs bg-white border-[#E2E8F0] text-[#4A5568]">
-                            {specialty}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Actions */}
-                    <div className="flex gap-2 pt-2 border-t border-[#E2E8F0]">
-                      {provider.phone && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="flex-1 border-[#E2E8F0] hover:bg-[#F8F5F0]"
-                          onClick={() => window.open(`tel:${provider.phone}`, '_self')}
-                        >
-                          <Phone className="w-4 h-4 mr-2" />
-                          Call
-                        </Button>
+                      {f.address && (
+                        <p className="text-xs text-[#718096] flex items-start gap-1">
+                          <MapPin className="w-3 h-3 mt-0.5 shrink-0 text-[#4A9B8E]" />
+                          <span className="line-clamp-1">{f.address}</span>
+                        </p>
                       )}
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="flex-1 border-[#E2E8F0] hover:bg-[#F8F5F0]"
-                        onClick={() => {
-                          const facility = realFacilities.find(f => f.id === provider.id);
-                          if (facility) {
-                            window.open(`https://www.google.com/maps/dir/?api=1&destination=${facility.lat},${facility.lon}`, '_blank');
-                          } else {
-                            window.open(`https://www.google.com/maps/search/${encodeURIComponent(provider.name + ' ' + provider.address)}`, '_blank');
-                          }
-                        }}
-                      >
-                        <Navigation className="w-4 h-4 mr-2" />
-                        Directions
-                      </Button>
                     </div>
-                  </motion.div>
-                ))}
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                      <span className="text-xs font-semibold text-[#2D3748]">4.0</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 mt-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 h-7 text-xs border-[#E2E8F0] hover:bg-[#F8F5F0]"
+                      onClick={e => {
+                        e.stopPropagation();
+                        window.open(
+                          `https://www.google.com/maps/dir/?api=1&destination=${f.lat},${f.lon}`,
+                          "_blank"
+                        );
+                      }}
+                    >
+                      <Navigation className="w-3 h-3 mr-1" /> Directions
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="flex-1 h-7 text-xs bg-[#4A9B8E] hover:bg-[#3d8578] text-white"
+                      onClick={e => { e.stopPropagation(); selectFacility(f); }}
+                    >
+                      <MapPin className="w-3 h-3 mr-1" /> View on Map
+                    </Button>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+
+          <div className="px-4 py-2 border-t border-[#E2E8F0] bg-[#F8F5F0] shrink-0">
+            <p className="text-xs text-[#718096]">
+              {filtered.length} facilities · Data from OpenStreetMap
+            </p>
+          </div>
+        </div>
+
+        {/* RIGHT — Leaflet map (md+ only) */}
+        <div className="hidden md:block flex-1 relative">
+          <MapContainer
+            center={mapCenter}
+            zoom={13}
+            style={{ width: "100%", height: "100%" }}
+            zoomControl
+          >
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            />
+
+            <FlyTo position={selected ? [selected.lat, selected.lon] : userPos} />
+
+            {/* User location pulse marker */}
+            {userPos && (
+              <Marker
+                position={userPos}
+                icon={L.divIcon({
+                  className: "",
+                  html: `<div style="width:16px;height:16px;background:#4A9B8E;border:3px solid white;border-radius:50%;box-shadow:0 0 0 5px #4A9B8E33"></div>`,
+                  iconSize: [16, 16],
+                  iconAnchor: [8, 8],
+                })}
+              >
+                <Popup><b>📍 You are here</b></Popup>
+              </Marker>
+            )}
+
+            {/* Facility markers */}
+            {filtered.map(f => (
+              <Marker
+                key={f.id}
+                position={[f.lat, f.lon]}
+                icon={L.divIcon({
+                  className: "",
+                  html: `<div style="
+                    background:${markerColor[f.type] ?? "#4A9B8E"};
+                    color:white;font-size:15px;
+                    width:36px;height:36px;
+                    border-radius:50% 50% 50% 0;
+                    transform:rotate(-45deg);
+                    display:flex;align-items:center;justify-content:center;
+                    border:2px solid white;
+                    box-shadow:0 2px 8px rgba(0,0,0,0.25);
+                    ${selected?.id === f.id ? "outline:3px solid #F6E05E;outline-offset:2px;" : ""}
+                  "><span style="transform:rotate(45deg)">${typeIcon[f.type] ?? "🏥"}</span></div>`,
+                  iconSize: [36, 36],
+                  iconAnchor: [18, 36],
+                  popupAnchor: [0, -38],
+                })}
+                eventHandlers={{ click: () => selectFacility(f) }}
+              >
+                <Popup>
+                  <div style={{ minWidth: 180 }}>
+                    <p style={{ fontWeight: 600, fontSize: 13, color: "#2D3748", marginBottom: 2 }}>{f.name}</p>
+                    {f.address && <p style={{ fontSize: 11, color: "#4A5568" }}>{f.address}</p>}
+                    <p style={{ fontSize: 11, color: "#4A9B8E", marginTop: 4, fontWeight: 500 }}>
+                      {f.distance < 1 ? `${Math.round(f.distance * 1000)}m away` : `${f.distance.toFixed(1)}km away`}
+                    </p>
+                    <button
+                      onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${f.lat},${f.lon}`, "_blank")}
+                      style={{
+                        marginTop: 8, width: "100%", fontSize: 11,
+                        background: "#4A9B8E", color: "white",
+                        border: "none", borderRadius: 6, padding: "4px 8px", cursor: "pointer"
+                      }}
+                    >
+                      Get Directions
+                    </button>
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
+          </MapContainer>
+
+          {/* Overlay prompt when no location */}
+          {!userPos && (
+            <div className="absolute inset-0 flex items-center justify-center z-[400] bg-black/10 backdrop-blur-[1px]">
+              <div className="bg-white rounded-2xl px-6 py-5 shadow-xl text-center max-w-xs">
+                <MapPin className="w-9 h-9 text-[#4A9B8E] mx-auto mb-2" />
+                <p className="text-sm font-semibold text-[#2D3748] mb-1">Enable location</p>
+                <p className="text-xs text-[#718096] mb-3">See real nearby facilities on the map</p>
+                <Button
+                  size="sm"
+                  onClick={locate}
+                  disabled={locating}
+                  className="bg-[#4A9B8E] hover:bg-[#3d8578] text-white w-full"
+                >
+                  {locating
+                    ? <><Loader2 className="w-4 h-4 animate-spin mr-1" /> Locating…</>
+                    : <><LocateFixed className="w-4 h-4 mr-1" /> Use My Location</>}
+                </Button>
               </div>
-            </CardContent>
-          </Card>
-        </motion.section>
-      </main>
+            </div>
+          )}
+        </div>
+      </div>
 
       <BottomNav items={navItems} />
     </div>
   );
-};
-
-export default MapPage;
+}

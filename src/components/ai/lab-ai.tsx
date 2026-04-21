@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
 import { aiLogger } from '@/lib/ai-logger';
+import { geminiVision } from '@/lib/gemini-vision';
 
 interface LabResult {
   analysis: string;
@@ -53,111 +54,40 @@ export function LabAI({ className }: LabAIProps) {
     aiLogger.aiStart('Lab AI', 'Report Analysis', inputData);
 
     try {
-      const API_KEY = 'REDACTED_GOOGLE_API_KEY';
-      console.log('🔑 API Key Status:', API_KEY ? 'Present' : 'Missing');
-      
-      let requestBody;
+      const detectedLang = reportText.match(/[\u0900-\u097F]/) ? 'hi' :
+        reportText.match(/[\u0B80-\u0BFF]/) ? 'ta' : 'en';
+
+      let parsed;
 
       if (uploadedImage) {
-        console.log('📁 Analyzing Image:', uploadedImage.name, uploadedImage.type, uploadedImage.size);
         const base64Image = await convertToBase64(uploadedImage);
-        console.log('🖼️ Base64 Image Length:', base64Image.length);
-        
-        requestBody = {
-          contents: [{
-            parts: [
-              {
-                text: `Look at this medical lab report image carefully and analyze what you see. Read ALL text, numbers, and values visible in the image.
-                
-                Return ONLY valid JSON:
-                {
-                  "analysis": "detailed analysis based on ACTUAL values you see in the image",
-                  "keyFindings": ["specific findings from the actual report values"],
-                  "riskZones": ["health risks based on the actual lab values shown"],
-                  "recommendations": ["specific advice based on the actual test results"]
-                }
-                
-                CRITICAL: Base your analysis ONLY on the actual lab values, test names, and results visible in this specific image. Don't give generic responses.`
-              },
-              {
-                inline_data: {
-                  mime_type: uploadedImage.type.includes('png') ? "image/png" : "image/jpeg",
-                  data: base64Image
-                }
-              }
-            ]
-          }],
-          generationConfig: {
-            temperature: 0.1,
-            topK: 32,
-            topP: 1,
-            maxOutputTokens: 1024
-          }
-        };
+        const prompt = `You are a clinical pathologist. Analyze this medical lab report image carefully. Read ALL text, numbers, and values visible.
+Return ONLY valid JSON:
+{
+  "analysis": "detailed analysis based on ACTUAL values you see",
+  "keyFindings": ["specific findings from the actual report values"],
+  "riskZones": ["health risks based on the actual lab values shown"],
+  "recommendations": ["specific advice based on the actual test results"]
+}`;
+        parsed = await geminiVision.analyzeImage(base64Image, prompt);
       } else {
-        console.log('📝 Analyzing Text:', reportText.substring(0, 100));
-        requestBody = {
-          contents: [{
-            parts: [{
-              text: `Analyze this lab report data: "${reportText}". Return ONLY valid JSON:
-              {
-                "analysis": "detailed analysis based on these specific values",
-                "keyFindings": ["findings from the actual data provided"],
-                "riskZones": ["health risks based on these specific values"],
-                "recommendations": ["advice based on these actual results"]
-              }
-              
-              CRITICAL: Base analysis on the actual values provided, not generic information.`
-            }]
-          }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 1024
-          }
-        };
+        const prompt = `You are a clinical pathologist. Analyze this lab report: "${reportText}"
+Return ONLY valid JSON:
+{
+  "analysis": "overall assessment in plain language",
+  "keyFindings": ["finding 1", "finding 2"],
+  "riskZones": ["risk 1", "risk 2"],
+  "recommendations": ["recommendation 1", "recommendation 2"]
+}`;
+        parsed = await geminiVision.analyzeText(prompt);
       }
 
-      console.log('📤 Making API Request to Gemini...');
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      });
-
-      console.log('📥 API Response Status:', response.status, response.statusText);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ API Error Response:', errorText);
-        throw new Error(`API failed: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      console.log('📊 Full API Response:', data);
-      
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      console.log('🤖 AI Response Text:', text);
-      
-      if (!text) {
-        throw new Error('No response from AI');
-      }
-
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        console.error('❌ No JSON found in response:', text);
-        throw new Error('No JSON found in response');
-      }
-
-      console.log('🔍 Extracted JSON:', jsonMatch[0]);
-      const parsed = JSON.parse(jsonMatch[0]);
-      console.log('✅ Parsed Analysis:', parsed);
-      
       setLabResult(parsed);
       aiLogger.aiSuccess('Lab AI', 'Report Analysis', { 
         findings: parsed.keyFindings?.length || 0,
         risks: parsed.riskZones?.length || 0 
       });
-      toast({ title: '🧪 Analysis complete with Gemini AI!' });
+      toast({ title: '🧪 Analysis complete!' });
       
     } catch (error) {
       aiLogger.aiError('Lab AI', 'Report Analysis', error);

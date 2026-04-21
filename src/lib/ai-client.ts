@@ -10,6 +10,14 @@ import {
 import LanguageDetector, { type SupportedLanguage } from './language-detection';
 import { sambaNovaAPI } from './sambanova-api';
 import { aiLogger } from './ai-logger';
+import {
+  ollamaAnalyzeSymptoms,
+  ollamaGetHealthAdvice,
+  ollamaAnalyzePrescription,
+  ollamaAnalyzeMisinformation,
+  ollamaAnalyzeFirstAid,
+  ollamaTestConnection
+} from './ollama-api';
 
 // AI Response Schemas
 const SymptomAnalysisSchema = z.object({
@@ -79,11 +87,12 @@ class AIClient {
   private model: string = 'gemini-2.5-flash';
   private lastErrorStatus: number = 0;
   private useSambaNova: boolean = true;
+  private useOllama: boolean = true;
 
   constructor() {
     this.apiKey = 'REDACTED_GOOGLE_API_KEY';
     this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
-    this.useSambaNova = true; // Enabled as primary/fallback
+    this.useSambaNova = false;
     this.checkConnectivity();
   }
 
@@ -108,7 +117,7 @@ class AIClient {
     }
 
     // Use available models with correct API version
-    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-001'];
+    const models = ['gemini-3-flash-preview', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-001'];
 
     for (const model of models) {
       try {
@@ -219,124 +228,99 @@ class AIClient {
   async analyzeSymptoms(symptoms: string, language?: string): Promise<SymptomAnalysis> {
     const startTime = Date.now();
     aiLogger.aiStart('AI Client', 'Symptom Analysis', symptoms);
-
-    // Auto-detect language if not provided
     const detectedLanguage = (language || LanguageDetector.detectLanguage(symptoms).language) as SupportedLanguage;
+    const langInstruction = LanguageDetector.getLanguageInstructions(detectedLanguage);
 
-    // Try SambaNova first if configured
-    if (this.useSambaNova) {
-      try {
-        aiLogger.aiStart('SambaNova', 'Symptom Analysis', symptoms);
-        const sambaResponse = await sambaNovaAPI.analyzeSymptoms(symptoms, detectedLanguage);
-        const result = SymptomAnalysisSchema.parse(sambaResponse);
-        aiLogger.aiSuccess('SambaNova', 'Symptom Analysis', result);
-        aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
-        return result;
-      } catch (error) {
-        aiLogger.aiError('SambaNova', 'Symptom Analysis', error);
-        aiLogger.aiFallback('AI Client', 'SambaNova', 'Gemini');
-      }
-    }
-
+    // 1. Try Gemini first
     try {
-      // First, use our medical database for initial analysis
       const symptomList = symptoms.toLowerCase().split(/[,\s]+/).filter(s => s.length > 2);
       const matchedConditions = findConditionsBySymptoms(symptomList);
-
-      // Check for emergency symptom clusters
       const emergencyCluster = SYMPTOM_CLUSTERS.find(cluster =>
         cluster.urgency === 'immediate' &&
         cluster.symptoms.some(s => symptomList.includes(s))
       );
-
       let primaryCondition = matchedConditions[0];
       let isEmergency = false;
-
       if (emergencyCluster) {
         isEmergency = true;
-        // Find the emergency condition from our database
         const emergencyCondition = MEDICAL_CONDITIONS.find(c =>
           emergencyCluster.conditions.includes(c.id) ||
           emergencyCluster.conditions.includes(c.name.toLowerCase().replace(/\s+/g, '_'))
         );
-        if (emergencyCondition) {
-          primaryCondition = emergencyCondition;
-        }
+        if (emergencyCondition) primaryCondition = emergencyCondition;
       }
+      const systemPrompt = `You are an expert doctor. ${langInstruction} Respond ONLY with valid JSON.
 
-      // Enhanced system prompt with medical database context and language preservation
-      const languageInstructions = LanguageDetector.getLanguageInstructions(detectedLanguage);
-      const systemPrompt = `You are an elite expert doctor. Be extremely concise and direct.
-      
-CRITICAL RULES:
-1. NO fluff, NO greetings, NO "Based on...". Start directly with the medical fact.
-2. ANSWERS: Max 2-3 sentences. Use bullet points for steps.
-3. QUESTIONS: Ask ONLY ONE follow-up question at a time. Max 10 words per question.
-4. TONE: Professional, sharp, authoritative, yet empathetic.
+IMPORTANT: All text values must be in ${LanguageDetector.getLanguageName(detectedLanguage)}.
+Detected conditions: ${matchedConditions.map(c => c.name).join(', ')}
+Emergency: ${isEmergency ? 'YES' : 'NO'}
 
-MEDICAL DATABASE CONTEXT:
-- Detected possible conditions: ${matchedConditions.map(c => c.name).join(', ')}
-- Emergency assessment: ${isEmergency ? 'POTENTIAL EMERGENCY' : 'No immediate emergency'}
-- Primary condition: ${primaryCondition?.name || 'Unknown'}
-
-RESPOND LIKE THIS:
-- "Likely a tension headache. Rest in a dark room."
-- "taking any medication?"
-- "High fever typically indicates infection. Monitor temperature closely."
-
-
-Example doctor response in ${LanguageDetector.getLanguageName(detectedLanguage)}:
+Return JSON:
 {
-  "condition": "${primaryCondition?.name || 'Upper respiratory infection'}",
+  "condition": "condition name",
   "confidence": 85,
-  "severity": "${primaryCondition?.severity || 'moderate'}",
-  "description": "Based on your symptoms, this looks like a common upper respiratory infection. These usually start with the symptoms you're describing and are quite treatable.",
-  "suggestions": [
-    "Start with plenty of rest and fluids - aim for 8-10 glasses of water daily",
-    "Take paracetamol 500mg every 6 hours for fever and aches",
-    "Use saline nasal drops or spray for congestion relief",
-    "Come see me if you're not feeling better in 5-7 days"
-  ],
-  "reasoning": "Your combination of symptoms is typical for what we see with viral infections this time of year. The good news is these usually resolve on their own with proper care.",
-  "emergency_contact": "${isEmergency ? 'This needs immediate attention - please go to the emergency room or call 108 right away' : 'See a doctor if symptoms worsen or you develop breathing difficulties'}",
-  "follow_up": "I'd like to see you back in a week if you're not improving, or sooner if you develop any concerning symptoms like difficulty breathing or high fever."
+  "severity": "mild|moderate|severe|emergency",
+  "description": "2-3 sentence assessment",
+  "suggestions": ["action 1", "action 2", "action 3"],
+  "reasoning": "brief reasoning",
+  "emergency_contact": "when to seek help",
+  "follow_up": "follow-up advice"
 }`;
-
       const response = await this.makeAPIRequest(symptoms, systemPrompt, detectedLanguage);
-
-      // Handle case where AI returns array instead of string for description
-      if (response.description && Array.isArray(response.description)) {
-        response.description = response.description.join('. ');
-      }
-
-      // Enhance response with medical database information
+      if (response.description && Array.isArray(response.description)) response.description = response.description.join('. ');
       if (primaryCondition) {
         response.condition = primaryCondition.name;
         response.severity = primaryCondition.severity;
         response.emergency_contact = getEmergencyAdvice(primaryCondition);
-
-        // Add treatment plan if available
-        if (response.follow_up) {
-          response.follow_up += '\n\n' + getTreatmentPlan(primaryCondition);
-        }
       }
-
       const result = SymptomAnalysisSchema.parse(response);
-      aiLogger.aiSuccess('AI Client', 'Symptom Analysis', result);
+      aiLogger.aiSuccess('Gemini', 'Symptom Analysis', result);
       aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
       return result;
     } catch (error) {
-      aiLogger.aiError('AI Client', 'Symptom Analysis', error);
-      aiLogger.aiOffline('AI Client', 'Symptom Analysis');
-      const fallbackResult = SymptomAnalysisSchema.parse(this.getOfflineResponse('symptom_analysis', symptoms, language));
-      aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
-      return fallbackResult;
+      aiLogger.aiError('Gemini', 'Symptom Analysis', error);
+      aiLogger.aiFallback('AI Client', 'Gemini', 'Ollama');
     }
+
+    // 2. Fallback to Ollama
+    if (this.useOllama) {
+      try {
+        const ollamaResponse = await ollamaAnalyzeSymptoms(symptoms, detectedLanguage);
+        const result = SymptomAnalysisSchema.parse(ollamaResponse);
+        aiLogger.aiSuccess('Ollama', 'Symptom Analysis', result);
+        aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
+        return result;
+      } catch (error) {
+        aiLogger.aiError('Ollama', 'Symptom Analysis', error);
+      }
+    }
+
+    // 3. Offline fallback
+    aiLogger.aiOffline('AI Client', 'Symptom Analysis');
+    const fallbackResult = SymptomAnalysisSchema.parse(this.getOfflineResponse('symptom_analysis', symptoms, detectedLanguage));
+    aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
+    return fallbackResult;
   }
 
   async analyzePrescription(prescriptionText: string, language: string = 'en'): Promise<PrescriptionAnalysis> {
     const startTime = Date.now();
     aiLogger.aiStart('AI Client', 'Prescription Analysis', prescriptionText);
+
+    // 1. Try Ollama first
+    if (this.useOllama) {
+      try {
+        aiLogger.aiStart('Ollama', 'Prescription Analysis', prescriptionText);
+        const ollamaResponse = await ollamaAnalyzePrescription(prescriptionText, language);
+        const result = PrescriptionAnalysisSchema.parse(ollamaResponse);
+        aiLogger.aiSuccess('Ollama', 'Prescription Analysis', result);
+        aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
+        return result;
+      } catch (error) {
+        aiLogger.aiError('Ollama', 'Prescription Analysis', error);
+        aiLogger.aiFallback('AI Client', 'Ollama', 'Gemini');
+      }
+    }
+
     const systemPrompt = `You are an AI prescription reader and medical interpreter. Analyze this prescription and provide detailed information in JSON format.
 
 Requirements:
@@ -382,96 +366,72 @@ Example response format:
   async getHealthAdvice(query: string, language: string = 'en'): Promise<HealthAdvice> {
     const startTime = Date.now();
     aiLogger.aiStart('AI Client', 'Health Advice', query);
+    const detectedLanguage = LanguageDetector.detectLanguage(query).language as SupportedLanguage;
+    const langInstruction = LanguageDetector.getLanguageInstructions(detectedLanguage);
 
-    // Try SambaNova first if configured
-    if (this.useSambaNova) {
-      try {
-        aiLogger.aiStart('SambaNova', 'Health Advice', query);
-        const sambaResponse = await sambaNovaAPI.getHealthAdvice(query, language);
-        const result = HealthAdviceSchema.parse(sambaResponse);
-        aiLogger.aiSuccess('SambaNova', 'Health Advice', result);
-        aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
-        return result;
-      } catch (error) {
-        aiLogger.aiError('SambaNova', 'Health Advice', error);
-        aiLogger.aiFallback('AI Client', 'SambaNova', 'Gemini');
-      }
-    }
-
+    // 1. Try Gemini first
     try {
-      let systemPrompt = '';
-      if (language === 'hi') {
-        systemPrompt = `You are an elite expert doctor. Be extremely concise and direct in Hindi.
-      
-CRITICAL RULES:
-1. NO fluff, NO greetings. Start directly with the medical fact.
-2. Max 2-3 sentences.
-3. Tone: Professional, authoritative.
+      const systemPrompt = `You are an expert doctor. ${langInstruction} Respond ONLY with valid JSON.
+IMPORTANT: All text values must be in ${LanguageDetector.getLanguageName(detectedLanguage)}.
 
-Only Hindi JSON response:
+Return JSON:
 {
-  "advice": "सीधी और स्पष्ट सलाह",
+  "advice": "clear direct medical advice in 2-3 sentences",
   "confidence": 85,
-  "reasoning": "चिकित्सा तथ्य",
-  "sources": ["चिकित्सा अनुभव"],
-  "contraindications": ["सावधानियां"]
+  "reasoning": "brief medical reasoning",
+  "sources": ["Medical Guidelines"],
+  "contraindications": ["relevant warnings"]
 }`;
-      } else if (language === 'ta') {
-        systemPrompt = `You are an elite expert doctor. Be extremely concise and direct in Tamil.
-      
-CRITICAL RULES:
-1. NO fluff, NO greetings. Start directly with the medical fact.
-2. Max 2-3 sentences.
-3. Tone: Professional, authoritative.
-
-Only Tamil JSON response:
-{
-  "advice": "நேரடியான மருத்துவ ஆலோசனை",
-  "confidence": 85,
-  "reasoning": "மருத்துவ உண்மை",
-  "sources": ["மருத்துவ அனுபவம்"],
-  "contraindications": ["எச்சரிக்கைகள்"]
-}`;
-      } else {
-        systemPrompt = `You are an elite expert doctor. Be extremely concise and direct.
-      
-CRITICAL RULES:
-1. NO fluff, NO greetings, NO "As an AI...". Start directly with the medical fact.
-2. ANSWERS: Max 2-3 sentences. Bullet points preferred.
-3. TONE: Professional, sharp, authoritative.
-
-JSON format:
-{
-  "advice": "Rest immediately. Hydrate.",
-  "confidence": 85,
-  "reasoning": "Classic signs of dehydration.",
-  "sources": ["Clinical Protocols"],
-  "contraindications": ["Avoid caffeine"]
-}`;
-      }
-
-      const response = await this.makeAPIRequest(query, systemPrompt, language);
-
-      if (response.advice && Array.isArray(response.advice)) {
-        response.advice = response.advice.join('. ');
-      }
-
+      const response = await this.makeAPIRequest(query, systemPrompt, detectedLanguage);
+      if (response.advice && Array.isArray(response.advice)) response.advice = response.advice.join('. ');
       const result = HealthAdviceSchema.parse(response);
-      aiLogger.aiSuccess('AI Client', 'Health Advice', result);
+      aiLogger.aiSuccess('Gemini', 'Health Advice', result);
       aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
       return result;
     } catch (error) {
-      aiLogger.aiError('AI Client', 'Health Advice', error);
-      aiLogger.aiOffline('AI Client', 'Health Advice');
-      const fallbackResult = HealthAdviceSchema.parse(this.getOfflineResponse('health_advice', query, language));
-      aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
-      return fallbackResult;
+      aiLogger.aiError('Gemini', 'Health Advice', error);
+      aiLogger.aiFallback('AI Client', 'Gemini', 'Ollama');
     }
+
+    // 2. Fallback to Ollama
+    if (this.useOllama) {
+      try {
+        const ollamaResponse = await ollamaGetHealthAdvice(query, detectedLanguage);
+        const result = HealthAdviceSchema.parse(ollamaResponse);
+        aiLogger.aiSuccess('Ollama', 'Health Advice', result);
+        aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
+        return result;
+      } catch (error) {
+        aiLogger.aiError('Ollama', 'Health Advice', error);
+      }
+    }
+
+    // 3. Offline fallback
+    aiLogger.aiOffline('AI Client', 'Health Advice');
+    const fallbackResult = HealthAdviceSchema.parse(this.getOfflineResponse('health_advice', query, detectedLanguage));
+    aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
+    return fallbackResult;
   }
 
   async analyzeMisinformation(claim: string, language: string = 'en'): Promise<MisinformationAnalysis> {
     const startTime = Date.now();
     aiLogger.aiStart('AI Client', 'Misinformation Analysis', claim);
+
+    // 1. Try Ollama first
+    if (this.useOllama) {
+      try {
+        aiLogger.aiStart('Ollama', 'Misinformation Analysis', claim);
+        const ollamaResponse = await ollamaAnalyzeMisinformation(claim, language);
+        const result = MisinformationAnalysisSchema.parse(ollamaResponse);
+        aiLogger.aiSuccess('Ollama', 'Misinformation Analysis', result);
+        aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
+        return result;
+      } catch (error) {
+        aiLogger.aiError('Ollama', 'Misinformation Analysis', error);
+        aiLogger.aiFallback('AI Client', 'Ollama', 'Gemini');
+      }
+    }
+
     const systemPrompt = `You are an AI fact-checker specializing in medical misinformation. Analyze this claim and provide verification in JSON format.
 
 Requirements:
@@ -513,6 +473,22 @@ Example response format:
   async analyzeFirstAid(imageDescription: string, language: string = 'en'): Promise<FirstAidAnalysis> {
     const startTime = Date.now();
     aiLogger.aiStart('AI Client', 'First Aid Analysis', imageDescription);
+
+    // 1. Try Ollama first
+    if (this.useOllama) {
+      try {
+        aiLogger.aiStart('Ollama', 'First Aid Analysis', imageDescription);
+        const ollamaResponse = await ollamaAnalyzeFirstAid(imageDescription, language);
+        const result = FirstAidAnalysisSchema.parse(ollamaResponse);
+        aiLogger.aiSuccess('Ollama', 'First Aid Analysis', result);
+        aiLogger.aiUsage('AI Client', undefined, Date.now() - startTime);
+        return result;
+      } catch (error) {
+        aiLogger.aiError('Ollama', 'First Aid Analysis', error);
+        aiLogger.aiFallback('AI Client', 'Ollama', 'Gemini');
+      }
+    }
+
     const systemPrompt = `You are an AI first aid advisor. Analyze this injury description and provide first aid guidance in JSON format.
 
 Requirements:
@@ -603,7 +579,18 @@ Example response format:
   async testConnection(): Promise<boolean> {
     aiLogger.aiStart('AI Client', 'Connection Test');
 
-    // Test SambaNova first if configured
+    // Test Ollama first
+    try {
+      const ollamaOk = await ollamaTestConnection();
+      if (ollamaOk) {
+        aiLogger.aiConnection('Ollama', 'connected');
+        return true;
+      }
+    } catch {
+      aiLogger.aiConnection('Ollama', 'failed');
+    }
+
+    // Test SambaNova
     if (this.useSambaNova) {
       try {
         const sambaTest = await sambaNovaAPI.testConnection();
@@ -634,6 +621,10 @@ Example response format:
 
   getSambaNovaStatus(): boolean {
     return this.useSambaNova && sambaNovaAPI.isConfigured();
+  }
+
+  getOllamaStatus(): boolean {
+    return this.useOllama;
   }
 
   // Offline fallback responses for when quota is exceeded

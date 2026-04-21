@@ -21,7 +21,7 @@ import {
   Brain
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { aiClient } from '@/lib/ai-client';
+import { geminiVision } from '@/lib/gemini-vision';
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { aiLogger } from '@/lib/ai-logger';
 
@@ -107,10 +107,30 @@ export function EnhancedPrescriptionReader({ className }: EnhancedPrescriptionRe
       const reader = new FileReader();
       reader.onload = async (e) => {
         const base64 = e.target?.result as string;
-        const imageText = base64.split(',')[1]; // Remove data:image/jpeg;base64, prefix
-        
-        // Analyze prescription using AI client
-        const analysisResult = await aiClient.analyzePrescription(imageText, selectedLanguage);
+        const imageText = base64.split(',')[1];
+
+        const prompt = `You are a clinical pharmacist. Analyze this prescription image carefully.
+Respond in ${selectedLanguage === 'hi' ? 'Hindi' : selectedLanguage === 'ta' ? 'Tamil' : 'English'}.
+Return ONLY valid JSON:
+{
+  "medicines": [
+    {
+      "name": "medicine name",
+      "dosage": "dose",
+      "frequency": "how often",
+      "duration": "how long",
+      "instructions": "how to take",
+      "side_effects": ["effect 1"],
+      "warnings": ["warning 1"]
+    }
+  ],
+  "doctor_name": "if visible",
+  "date": "if visible",
+  "confidence": 88,
+  "language": "${selectedLanguage}"
+}`;
+
+        const analysisResult = await geminiVision.analyzeImage(imageText, prompt);
         
         // Format result to match expected structure
         const formattedResult = {
