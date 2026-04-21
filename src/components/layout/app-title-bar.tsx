@@ -16,7 +16,7 @@ export function AppTitleBar() {
             <span className="text-sm">✨</span>
           </div>
           <div>
-            <h1 className="text-lg font-bold text-foreground">Vaidyāna</h1>
+            <h1 className="text-lg font-bold text-foreground">Synora</h1>
             <p className="text-xs text-muted-foreground hidden sm:block">The Healing Intelligence</p>
           </div>
         </div>

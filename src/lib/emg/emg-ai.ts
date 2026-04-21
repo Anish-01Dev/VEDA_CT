@@ -16,11 +16,9 @@ export interface EMGHealthInsight {
   source: 'ai' | 'rule-based';
 }
 
-const GEMINI_KEY = import.meta.env.VITE_GEMINI_TEXT_KEY ?? '';
+const GEMINI_KEY = 'REDACTED_GOOGLE_API_KEY';
 const GEMINI_MODELS = [
-  'gemini-2.5-flash-preview-05-20',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
+  'gemini-3-flash-preview',
 ];
 
 async function callGemini(prompt: string): Promise<any> {
@@ -35,11 +33,31 @@ async function callGemini(prompt: string): Promise<any> {
           generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
         }),
       });
+      if (res.status === 429) {
+        console.warn(`EMG AI: ${model} quota exceeded, waiting 2s...`);
+        await new Promise(r => setTimeout(r, 2000));
+        // retry once
+        const retry = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
+          }),
+        });
+        if (!retry.ok) { console.warn(`EMG AI: ${model} retry failed ${retry.status}`); continue; }
+        const data = await retry.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+        const match = text.match(/\{[\s\S]*\}/);
+        if (!match) continue;
+        console.log(`EMG AI: used ${model} (after retry)`);
+        return JSON.parse(match[0]);
+      }
       if (!res.ok) { console.warn(`EMG AI: ${model} returned ${res.status}, trying next...`); continue; }
       const data = await res.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
       const match = text.match(/\{[\s\S]*\}/);
-      if (!match) { console.warn(`EMG AI: no JSON from ${model}, trying next...`); continue; }
+      if (!match) { console.warn(`EMG AI: no JSON from ${model}`); continue; }
       console.log(`EMG AI: used ${model}`);
       return JSON.parse(match[0]);
     } catch (e) {

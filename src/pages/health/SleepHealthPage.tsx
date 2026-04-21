@@ -51,70 +51,54 @@ const SleepHealthPage = () => {
     
     try {
       const API_KEY = import.meta.env.VITE_GEMINI_TEXT_KEY ?? '';
-      const MODEL = 'gemini-3-flash-preview';
+      const MODELS = ['gemini-3-flash-preview'];
       const bedTime = new Date(`2024-01-01 ${sleepData.bedtime}`);
       const wakeTime = new Date(`2024-01-01 ${sleepData.wakeTime}`);
       let sleepDuration = (wakeTime.getTime() - bedTime.getTime()) / (1000 * 60 * 60);
-      
       if (sleepDuration < 0) sleepDuration += 24;
-      
+
       const languageMap = {
-        'en': 'English',
-        'hi': 'Hindi (हिंदी)',
-        'ta': 'Tamil (தமிழ்)',
-        'te': 'Telugu (తెలుగు)',
-        'pa': 'Punjabi (ਪੰਜਾਬੀ)'
+        'en': 'English', 'hi': 'Hindi (हिंदी)', 'ta': 'Tamil (தமிழ்)',
+        'te': 'Telugu (తెలుగు)', 'pa': 'Punjabi (ਪੰਜਾਬੀ)'
       };
-      
       const targetLanguage = languageMap[currentLanguage] || 'English';
-      const languageInstruction = currentLanguage !== 'en' 
-        ? `CRITICAL: All recommendations, insights, and analysis MUST be written ONLY in ${targetLanguage}. Do not use any English words or phrases.`
+      const languageInstruction = currentLanguage !== 'en'
+        ? `CRITICAL: All recommendations, insights, and analysis MUST be written ONLY in ${targetLanguage}.`
         : '';
-      
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Analyze this sleep data and provide personalized recommendations. ${languageInstruction}
-              
-              Return ONLY a valid JSON response with:
-              {
-                "sleepDuration": "${sleepDuration.toFixed(1)}",
-                "sleepScore": score_out_of_100,
-                "recommendations": ["rec1", "rec2", "rec3", "rec4"],
-                "sleepPhases": {
-                  "deep": deep_sleep_hours,
-                  "rem": rem_sleep_hours,
-                  "light": light_sleep_hours
-                },
-                "insights": "detailed sleep analysis"
-              }
-              
-              Sleep Data:
-              - Bedtime: ${formatTime12Hour(sleepData.bedtime)}
-              - Wake time: ${formatTime12Hour(sleepData.wakeTime)}
-              - Sleep duration: ${sleepDuration.toFixed(1)} hours
-              - Sleep quality (1-10): ${sleepData.sleepQuality}
-              - Interruptions: ${sleepData.interruptions}
-              
-              IMPORTANT: Return ONLY the JSON object, no additional text. All text content in the JSON must be in ${targetLanguage}.`
-            }]
-          }]
-        })
+
+      const body = JSON.stringify({
+        contents: [{ parts: [{ text: `Analyze this sleep data and provide personalized recommendations. ${languageInstruction}
+Return ONLY a valid JSON response:
+{
+  "sleepDuration": "${sleepDuration.toFixed(1)}",
+  "sleepScore": score_out_of_100,
+  "recommendations": ["rec1", "rec2", "rec3", "rec4"],
+  "sleepPhases": { "deep": hours, "rem": hours, "light": hours },
+  "insights": "detailed sleep analysis"
+}
+Sleep Data: Bedtime ${formatTime12Hour(sleepData.bedtime)}, Wake ${formatTime12Hour(sleepData.wakeTime)}, Duration ${sleepDuration.toFixed(1)}h, Quality ${sleepData.sleepQuality}/10, Interruptions ${sleepData.interruptions}.
+IMPORTANT: Return ONLY the JSON object. All text in ${targetLanguage}.` }] }]
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const text = data.candidates[0].content.parts[0].text;
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        const jsonText = jsonMatch ? jsonMatch[0] : text;
-        const parsed = JSON.parse(jsonText);
-        setAnalysis(parsed);
-      } else {
-        throw new Error('API request failed');
+      let response: Response | null = null;
+      for (const model of MODELS) {
+        try {
+          response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`,
+            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
+          );
+          if (response.ok) break;
+          console.warn(`Sleep AI: ${model} returned ${response.status}, trying next...`);
+          response = null;
+        } catch { response = null; }
       }
+
+      if (!response || !response.ok) throw new Error('API request failed');
+      const data = await response.json();
+      const text = data.candidates[0].content.parts[0].text;
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+      setAnalysis(parsed);
     } catch (error) {
       console.error('Sleep analysis failed:', error);
       setAnalysis(null);
