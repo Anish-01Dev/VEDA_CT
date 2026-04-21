@@ -32,6 +32,7 @@ import MisinformationBusterPage from "./pages/tools/MisinformationBusterPage";
 import PrescriptionScannerPage from "./pages/tools/PrescriptionScannerPage";
 import VirtualDoctorPage from "./pages/VirtualDoctorPage";
 import SimpleAITest from "./components/debug/SimpleAITest";
+import EMGHealthPage from "./pages/health/EMGHealthPage";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,7 @@ const App = () => (
               <Route path="/health/vaccine-tracker" element={<VaccineTrackerPage />} />
               <Route path="/health/cognitive-health" element={<CognitiveHealthPage />} />
               <Route path="/health/lab-analysis" element={<LabAnalysisPage />} />
+              <Route path="/health/emg" element={<EMGHealthPage />} />
               <Route path="/chat" element={<ChatPage />} />
               <Route path="/map" element={<MapPage />} />
               <Route path="/tools" element={<ToolsPage />} />

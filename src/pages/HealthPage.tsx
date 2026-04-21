@@ -78,6 +78,15 @@ const HealthPage = () => {
       color: "health-good",
       path: "/health/lab-analysis",
       status: t('available')
+    },
+    {
+      id: "emg-monitor",
+      title: "EMG Muscle Monitor",
+      description: "Real-time muscle activity via Arduino Uno — fatigue & strain detection",
+      icon: <Activity className="w-6 h-6" />,
+      color: "primary",
+      path: "/health/emg",
+      status: t('available')
     }
   ];
 
@@ -116,6 +125,7 @@ const HealthPage = () => {
     'vaccine-tracker': { color: '#3182CE', bg: '#3182CE20' },
     'cognitive-health': { color: '#4A9B8E', bg: '#4A9B8E20' },
     'lab-analysis': { color: '#68D391', bg: '#68D39120' },
+    'emg-monitor':  { color: '#4A9B8E', bg: '#4A9B8E20' },
   };
 
   return (

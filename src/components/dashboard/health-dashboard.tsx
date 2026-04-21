@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { EMGDashboardWidget } from '@/components/emg/EMGDashboardWidget';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -174,6 +175,9 @@ export default function HealthDashboard() {
               </Card>
             ))}
           </div>
+
+          {/* EMG Muscle Monitor Widget */}
+          <EMGDashboardWidget />
 
           {/* Health Summary */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
