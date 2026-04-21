@@ -14,6 +14,8 @@ import { EMGStatusIndicator } from '@/components/emg/EMGStatusIndicator';
 import { EMGInsightsPanel } from '@/components/emg/EMGInsightsPanel';
 import { EMGSessionReport } from '@/components/emg/EMGSessionReport';
 import { EMGSessionHistoryChart } from '@/components/emg/EMGSessionHistoryChart';
+import { EMGHeartDualChart } from '@/components/emg/EMGHeartDualChart';
+import { useHeartbeat } from '@/hooks/emg/useHeartbeat';
 import { useAuth } from '@/contexts/auth-context';
 import type { ProcessedEMG } from '@/lib/emg/emg-processing';
 
@@ -21,6 +23,8 @@ interface CompletedSession {
   history: ProcessedEMG[];
   durationSeconds: number;
   activityType: string;
+  heartbeatStats?: any;
+  heartbeatHistory?: any[];
 }
 
 export default function EMGHealthPage() {
@@ -29,6 +33,7 @@ export default function EMGHealthPage() {
   const patientId = user?.id ?? '';
 
   const emg = useEmgStream();
+  const heartbeat = useHeartbeat(emg.normalized, emg.isConnected);
   const [dbSessions, setDbSessions] = useState<any[]>([]);
   const [localSessions, setLocalSessions] = useState<CompletedSession[]>([]);
   const [sessionStart, setSessionStart] = useState<number | null>(null);
@@ -66,8 +71,9 @@ export default function EMGHealthPage() {
 
   const handleStopSession = async () => {
     const snapshot = await emg.stopSession();
-    setCompletedSession(snapshot);
-    // Accumulate local sessions for chart (used when not logged in)
+    const hbSnapshot = heartbeat.getSnapshot();
+    setCompletedSession({ ...snapshot, heartbeatStats: hbSnapshot, heartbeatHistory: hbSnapshot.history });
+    heartbeat.reset();
     setLocalSessions(prev => [...prev, snapshot]);
     setHistoryRefresh(r => r + 1);
     setActiveTab('report');
@@ -146,13 +152,21 @@ export default function EMGHealthPage() {
 
           {/* LIVE */}
           <TabsContent value="monitor" className="space-y-4 mt-4">
-            <EMGLiveChart history={emg.history} />
+            {/* Dual EMG + ECG chart */}
+            <EMGHeartDualChart
+              emgHistory={emg.history}
+              heartHistory={heartbeat.history}
+              currentBpm={heartbeat.currentBpm}
+              isActive={emg.isConnected}
+              zone={heartbeat.stats.zone}
+            />
             <div className="grid grid-cols-2 gap-3">
               <EMGFatigueGauge fatigueLevel={emg.fatigueLevel} fatigueIndex={emg.fatigueIndex} />
               <div className="flex flex-col gap-2 p-4 bg-white rounded-xl border border-[#E2E8F0]">
                 <Stat label="Signal" value={emg.signal.toString()} unit="raw" />
                 <Stat label="Normalized" value={`${(emg.normalized * 100).toFixed(1)}`} unit="%" />
-                <Stat label="Strain" value={emg.strainDetected ? 'YES' : 'NO'} alert={emg.strainDetected} />
+                <Stat label="Heart Rate" value={heartbeat.currentBpm.toString()} unit="bpm" />
+                <Stat label="HR Zone" value={heartbeat.stats.zone} />
                 {emg.isSessionActive && (
                   <Stat label="Duration" value={formatDuration(sessionDuration)} />
                 )}
@@ -217,6 +231,7 @@ export default function EMGHealthPage() {
                   history={completedSession.history}
                   durationSeconds={completedSession.durationSeconds}
                   activityType={completedSession.activityType}
+                  heartbeatStats={completedSession.heartbeatStats}
                   onNewSession={handleNewSession}
                 />
               ) : (

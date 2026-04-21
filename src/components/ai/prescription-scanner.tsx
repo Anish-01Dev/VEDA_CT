@@ -68,7 +68,7 @@ export function PrescriptionScanner({ className }: PrescriptionScannerProps) {
     setIsScanning(true);
 
     try {
-      const API_KEY = 'REDACTED_GOOGLE_API_KEY';
+      const API_KEY = import.meta.env.VITE_GEMINI_VISION_KEY ?? '';
       console.log('🔑 API Key Status:', API_KEY ? 'Present' : 'Missing');
       console.log('📁 Prescription Image:', uploadedImage.name, uploadedImage.type, uploadedImage.size);
       

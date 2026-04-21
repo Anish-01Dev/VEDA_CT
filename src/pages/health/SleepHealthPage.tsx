@@ -50,7 +50,7 @@ const SleepHealthPage = () => {
     setIsAnalyzing(true);
     
     try {
-      const API_KEY = 'REDACTED_GOOGLE_API_KEY';
+      const API_KEY = import.meta.env.VITE_GEMINI_TEXT_KEY ?? '';
       const MODEL = 'gemini-3-flash-preview';
       const bedTime = new Date(`2024-01-01 ${sleepData.bedtime}`);
       const wakeTime = new Date(`2024-01-01 ${sleepData.wakeTime}`);

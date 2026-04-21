@@ -90,7 +90,7 @@ class AIClient {
   private useOllama: boolean = true;
 
   constructor() {
-    this.apiKey = 'REDACTED_GOOGLE_API_KEY';
+    this.apiKey = import.meta.env.VITE_GEMINI_TEXT_KEY ?? '';
     this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
     this.useSambaNova = false;
     this.checkConnectivity();

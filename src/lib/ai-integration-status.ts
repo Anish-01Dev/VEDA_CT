@@ -35,12 +35,12 @@ export const AI_INTEGRATION_STATUS = {
   sambanova: {
     model: 'Meta-Llama-3.1-8B-Instruct',
     status: 'Active',
-    apiKey: 'REDACTED_API_KEY'
+    apiKey: import.meta.env.VITE_SAMBANOVA_API_KEY ?? ''
   },
   gemini: {
     models: ['gemini-2.5-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-flash'],
     status: 'Active',
-    apiKey: 'REDACTED_GOOGLE_API_KEY'
+    apiKey: import.meta.env.VITE_GEMINI_TEXT_KEY ?? ''
   },
   integration: 'Complete - All Errors Fixed',
   lastUpdated: new Date().toISOString(),

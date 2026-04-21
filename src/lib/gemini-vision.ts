@@ -5,7 +5,7 @@ class GeminiVisionAPI {
   private apiKey: string;
 
   constructor() {
-    this.apiKey = 'REDACTED_GOOGLE_API_KEY';
+    this.apiKey = import.meta.env.VITE_GEMINI_VISION_KEY ?? '';
   }
 
   async analyzeText(prompt: string): Promise<any> {

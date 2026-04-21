@@ -91,7 +91,7 @@ const DietAdvisorPage = () => {
     setIsAnalyzing(true);
     aiLogger.aiStart('Diet Advisor', 'Food Analysis', selectedImage.name);
     try {
-      const API_KEY = 'REDACTED_GOOGLE_API_KEY';
+      const API_KEY = import.meta.env.VITE_GEMINI_VISION_KEY ?? '';
       const base64Image = await convertToBase64(selectedImage);
       const requestBody = {
         contents: [{
@@ -145,7 +145,7 @@ Medical context: ${profile.medicalCondition || 'general health'}. Base analysis 
     setIsGenerating(true);
     aiLogger.aiStart('Diet Advisor', 'Meal Plan Generation', profile);
     try {
-      const API_KEY = 'REDACTED_GOOGLE_API_KEY';
+      const API_KEY = import.meta.env.VITE_GEMINI_TEXT_KEY ?? '';
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
