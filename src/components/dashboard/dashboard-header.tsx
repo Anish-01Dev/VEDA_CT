@@ -85,9 +85,9 @@ export function DashboardHeader() {
       {/* Logo & Subtitle */}
       <div className="flex flex-col gap-1 pt-8 sm:pt-2">
         <img
-          src="/logo.png"
-          alt="Pixal Health"
-          className="h-16 sm:h-20 w-auto object-contain self-start mb-1"
+          src="/synora-logo.jpeg"
+          alt="Synora AI"
+          className="h-10 sm:h-12 w-auto object-contain self-start mb-1"
         />
       </div>
       

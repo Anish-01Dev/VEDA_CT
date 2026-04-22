@@ -30,7 +30,6 @@ import PCOSTrackerPage from "./pages/tools/PCOSTrackerPage";
 import MaternalHealthAdvisorPage from "./pages/tools/MaternalHealthAdvisorPage";
 import MisinformationBusterPage from "./pages/tools/MisinformationBusterPage";
 import PrescriptionScannerPage from "./pages/tools/PrescriptionScannerPage";
-import VirtualDoctorPage from "./pages/VirtualDoctorPage";
 import SimpleAITest from "./components/debug/SimpleAITest";
 import EMGHealthPage from "./pages/health/EMGHealthPage";
 
@@ -66,7 +65,6 @@ const App = () => (
               <Route path="/tools/maternal-health-advisor" element={<MaternalHealthAdvisorPage />} />
               <Route path="/tools/misinformation-buster" element={<MisinformationBusterPage />} />
               <Route path="/tools/prescription-scanner" element={<PrescriptionScannerPage />} />
-              <Route path="/virtual-doctor" element={<VirtualDoctorPage />} />
               <Route path="/health-records" element={<HealthRecordsPage />} />
               <Route path="/pharmacy" element={<PharmacyPage />} />
               <Route path="/sos" element={<SOSPage />} />

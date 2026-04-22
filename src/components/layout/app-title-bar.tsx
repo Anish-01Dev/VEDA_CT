@@ -11,14 +11,12 @@ export function AppTitleBar() {
       transition={{ delay: 0.2 }}
     >
       <div className="flex items-center justify-between max-w-7xl mx-auto">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary-glow rounded-lg flex items-center justify-center shadow-md">
-            <span className="text-sm">✨</span>
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-foreground">Synora</h1>
-            <p className="text-xs text-muted-foreground hidden sm:block">The Healing Intelligence</p>
-          </div>
+        <div className="flex items-center">
+          <img
+            src="/synora-logo.jpeg"
+            alt="Synora AI"
+            className="h-8 sm:h-10 w-auto object-contain"
+          />
         </div>
         <LanguageToggle />
       </div>

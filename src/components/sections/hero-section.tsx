@@ -2,7 +2,6 @@ import { motion } from "framer-motion";
 import { Shield, Wifi, Sparkles, ArrowRight, Zap } from "lucide-react";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
 import { useLanguage } from "@/contexts/language-context";
 
 export function HeroSection() {
@@ -47,16 +46,7 @@ export function HeroSection() {
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link to="/virtual-doctor">
-                  <Button className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
-                    {t('try.virtual.doctor')}
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </Link>
-                <Button
-                  variant="outline"
-                  className="w-full sm:w-auto border-primary text-primary hover:bg-primary/5 bg-transparent"
-                >
+                <Button className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
                   {t('watch.how.works')}
                 </Button>
               </div>
